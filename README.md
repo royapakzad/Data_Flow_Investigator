@@ -1,4 +1,4 @@
-# Vendor Data Flow Analyzer
+# Data Flow Investigator
 
 An AI-powered tool that helps schools and districts investigate edtech vendor data privacy practices — so procurement officers can scrutinize what they're being sold before signing.
 
