@@ -1,60 +1,72 @@
-import { GoogleGenerativeAI, SchemaType, FunctionCallingMode, type FunctionDeclaration } from "@google/generative-ai";
+import OpenAI from "openai";
 import { braveSearch } from "./brave-search";
 import { lookupExodus } from "./exodus";
 import { lookupAppStore } from "./appstore";
 import { buildMermaidDiagram } from "./diagram";
 import type { VendorReport } from "./types";
 
-const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
+const TOOLS: OpenAI.Chat.ChatCompletionTool[] = [
   {
-    name: "search_web",
-    description:
-      "Search the web for information. Use targeted queries like 'ClassDojo privacy policy site:classdojo.com' or 'ClassDojo subprocessor list'.",
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        query: { type: SchemaType.STRING, description: "Search query" },
-        count: { type: SchemaType.NUMBER, description: "Number of results (1-10, default 5)" },
+    type: "function",
+    function: {
+      name: "search_web",
+      description:
+        "Search the web for information. Use targeted queries like 'ClassDojo privacy policy site:classdojo.com' or 'ClassDojo subprocessor list'.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query" },
+          count: { type: "number", description: "Number of results (1-10, default 5)" },
+        },
+        required: ["query"],
       },
-      required: ["query"],
     },
   },
   {
-    name: "fetch_page",
-    description:
-      "Fetch a web page and return its text content. Use for privacy policies, DPAs, subprocessor lists. Returns up to 8000 characters.",
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        url: { type: SchemaType.STRING, description: "URL to fetch" },
+    type: "function",
+    function: {
+      name: "fetch_page",
+      description:
+        "Fetch a web page and return its text content. Use for privacy policies, DPAs, subprocessor lists. Returns up to 8000 characters.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "URL to fetch" },
+        },
+        required: ["url"],
       },
-      required: ["url"],
     },
   },
   {
-    name: "lookup_exodus",
-    description:
-      "Look up an Android app on Exodus Privacy to get detected trackers and permissions. Pass the app name or package name.",
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        appName: { type: SchemaType.STRING, description: "App name or Android package name" },
+    type: "function",
+    function: {
+      name: "lookup_exodus",
+      description:
+        "Look up an Android app on Exodus Privacy to get detected trackers and permissions. Pass the app name or package name.",
+      parameters: {
+        type: "object",
+        properties: {
+          appName: { type: "string", description: "App name or Android package name" },
+        },
+        required: ["appName"],
       },
-      required: ["appName"],
     },
   },
   {
-    name: "lookup_appstore",
-    description:
-      "Look up an app on the Apple App Store via iTunes Search API. Returns app metadata including privacy policy URL.",
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        appName: { type: SchemaType.STRING, description: "App name to search for" },
+    type: "function",
+    function: {
+      name: "lookup_appstore",
+      description:
+        "Look up an app on the Apple App Store via iTunes Search API. Returns app metadata including privacy policy URL.",
+      parameters: {
+        type: "object",
+        properties: {
+          appName: { type: "string", description: "App name to search for" },
+        },
+        required: ["appName"],
       },
-      required: ["appName"],
     },
   },
 ];
@@ -250,73 +262,78 @@ export async function runAgent(
   vendorName: string,
   onProgress: (msg: string) => void
 ): Promise<VendorReport> {
-  const model = client.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    systemInstruction: SYSTEM_PROMPT,
-    tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
-    toolConfig: { functionCallingConfig: { mode: FunctionCallingMode.AUTO } },
-    generationConfig: { maxOutputTokens: 8192 },
-  });
-
-  const chat = model.startChat();
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    { role: "system", content: SYSTEM_PROMPT },
+    {
+      role: "user",
+      content: `Investigate the edtech vendor/app: "${vendorName}". Gather all available public information about their data practices and output the JSON report.`,
+    },
+  ];
 
   onProgress(`Starting investigation of "${vendorName}"...`);
 
-  let result = await chat.sendMessage(
-    `Investigate the edtech vendor/app: "${vendorName}". Gather all available public information about their data practices and output the JSON report.`
-  );
+  const MAX_ITERATIONS = 25;
 
-  let iterations = 0;
-  const MAX_ITERATIONS = 20;
+  for (let i = 0; i < MAX_ITERATIONS; i++) {
+    const response = await client.chat.completions.create({
+      model: "o4-mini",
+      messages,
+      tools: TOOLS,
+      tool_choice: "auto",
+      max_completion_tokens: 16000,
+    });
 
-  while (iterations < MAX_ITERATIONS) {
-    iterations++;
+    const choice = response.choices[0];
+    const message = choice.message;
 
-    const response = result.response;
-    const functionCalls = response.functionCalls();
+    // Always push the assistant turn so the conversation stays valid
+    messages.push(message);
 
-    if (!functionCalls || functionCalls.length === 0) {
-      let jsonStr = response.text().trim();
+    // ── Final answer ──────────────────────────────────────────────────────────
+    if (choice.finish_reason === "stop") {
+      let jsonStr = (message.content ?? "").trim();
       if (jsonStr.startsWith("```")) {
         jsonStr = jsonStr.replace(/^```[a-z]*\n?/, "").replace(/\n?```$/, "");
       }
 
       const report = JSON.parse(jsonStr) as VendorReport;
       report.analysisDate = new Date().toISOString();
-      // Build diagram from structured nodes (guaranteed valid Mermaid)
       if (report.dataFlowNodes?.length) {
         report.diagramCode = buildMermaidDiagram(report.dataFlowNodes, report.vendorName);
       }
       return report;
     }
 
-    const toolResponses = [];
+    // ── Tool calls ────────────────────────────────────────────────────────────
+    if (choice.finish_reason === "tool_calls" && message.tool_calls?.length) {
+      for (const call of message.tool_calls) {
+        if (call.type !== "function") continue;
+        const toolName = call.function.name;
+        let toolInput: Record<string, unknown> = {};
+        try { toolInput = JSON.parse(call.function.arguments); } catch { /* keep empty */ }
 
-    for (const call of functionCalls) {
-      const toolName = call.name;
-      const toolInput = call.args as Record<string, unknown>;
+        const progressMsg = (() => {
+          if (toolName === "search_web")    return `Searching: "${toolInput.query}"`;
+          if (toolName === "fetch_page")    return `Fetching: ${toolInput.url}`;
+          if (toolName === "lookup_exodus") return `Checking Exodus Privacy for "${toolInput.appName}"`;
+          if (toolName === "lookup_appstore") return `Checking App Store for "${toolInput.appName}"`;
+          return `Running ${toolName}`;
+        })();
+        onProgress(progressMsg);
 
-      const progressMsg = (() => {
-        if (toolName === "search_web") return `Searching: "${toolInput.query}"`;
-        if (toolName === "fetch_page") return `Fetching: ${toolInput.url}`;
-        if (toolName === "lookup_exodus") return `Checking Exodus Privacy for "${toolInput.appName}"`;
-        if (toolName === "lookup_appstore") return `Checking App Store for "${toolInput.appName}"`;
-        return `Running ${toolName}`;
-      })();
+        const output = await executeTool(toolName, toolInput);
 
-      onProgress(progressMsg);
-
-      const output = await executeTool(toolName, toolInput);
-
-      toolResponses.push({
-        functionResponse: {
-          name: toolName,
-          response: { result: output },
-        },
-      });
+        messages.push({
+          role: "tool",
+          tool_call_id: call.id,
+          content: output,
+        });
+      }
+      continue;
     }
 
-    result = await chat.sendMessage(toolResponses);
+    // Unexpected finish reason — stop
+    break;
   }
 
   throw new Error("Agent exceeded maximum iterations");
