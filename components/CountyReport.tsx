@@ -271,18 +271,18 @@ function CrossSectorCard({
 
 // ── Safeguard row ─────────────────────────────────────────────────────────────
 
-const SAFEGUARD_STYLES: Record<string, { icon: string; color: string; bg: string; border: string }> = {
-  "federal-law": { icon: "✅", color: "text-emerald-300", bg: "bg-emerald-950/20", border: "border-emerald-500/20" },
-  "state-law":   { icon: "✅", color: "text-blue-300",    bg: "bg-blue-950/20",    border: "border-blue-500/20" },
-  policy:        { icon: "📋", color: "text-yellow-300",  bg: "bg-yellow-950/20",  border: "border-yellow-500/20" },
-  technical:     { icon: "🔒", color: "text-cyan-300",    bg: "bg-cyan-950/20",    border: "border-cyan-500/20" },
-  gap:           { icon: "⚠️", color: "text-red-300",     bg: "bg-red-950/20",     border: "border-red-500/20" },
+const SAFEGUARD_SCOPE_LABEL: Record<string, string> = {
+  federal:           "Federal",
+  state:             "State",
+  "county-district": "County/District",
 };
 
-const SCOPE_BADGE: Record<string, string> = {
-  federal:         "bg-slate-700 text-slate-300",
-  state:           "bg-blue-500/20 text-blue-300",
-  "county-district": "bg-amber-500/20 text-amber-300",
+const CATEGORY_LABEL: Record<string, string> = {
+  "federal-law": "Federal law",
+  "state-law":   "State law",
+  policy:        "Policy",
+  technical:     "Technical",
+  gap:           "Gap",
 };
 
 function SafeguardRow({
@@ -292,23 +292,23 @@ function SafeguardRow({
   safeguard: DataSafeguard;
   getCite: (n: number) => Citation | undefined;
 }) {
-  const style = SAFEGUARD_STYLES[safeguard.category] ?? SAFEGUARD_STYLES.policy;
-
   return (
-    <div className={`flex gap-3 p-4 rounded-xl border ${style.border} ${style.bg}`}>
-      <span className="text-base shrink-0 mt-0.5">{style.icon}</span>
+    <div className="flex gap-3 p-4 rounded-xl border border-slate-700 bg-slate-800/30">
       <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
           {safeguard.url ? (
             <a href={safeguard.url} target="_blank" rel="noopener noreferrer"
-              className={`font-semibold text-sm hover:underline ${style.color}`}>
+              className="font-semibold text-sm text-slate-200 hover:underline">
               {safeguard.name} ↗
             </a>
           ) : (
-            <p className={`font-semibold text-sm ${style.color}`}>{safeguard.name}</p>
+            <p className="font-semibold text-sm text-slate-200">{safeguard.name}</p>
           )}
-          <span className={`text-[10px] px-2 py-0.5 rounded-full capitalize ${SCOPE_BADGE[safeguard.scope]}`}>
-            {safeguard.scope}
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-400">
+            {CATEGORY_LABEL[safeguard.category] ?? safeguard.category}
+          </span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-400">
+            {SAFEGUARD_SCOPE_LABEL[safeguard.scope] ?? safeguard.scope}
           </span>
           {safeguard.citationNumbers.map((n) => {
             const c = getCite(n);
@@ -494,7 +494,7 @@ export function CountyReport({ report }: Props) {
       {(otherSafeguards.length > 0 || gapSafeguards.length > 0) && (
         <Section
           title="Policies, Technical Controls & Gaps"
-          subtitle="Administrative policies and technical safeguards — and where protections are absent or unclear.">
+          subtitle="Administrative policies and technical safeguards.">
           <div className="space-y-3">
             {[...otherSafeguards, ...gapSafeguards].map((s, i) => (
               <SafeguardRow key={i} safeguard={s} getCite={getCite} />
