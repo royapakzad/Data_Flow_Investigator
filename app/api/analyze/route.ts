@@ -1,3 +1,6 @@
+import { randomUUID } from "crypto";
+import { waitUntil } from "@vercel/functions";
+import { createJob, updateJob } from "@/lib/jobs";
 import { runAgent } from "@/lib/agent";
 
 export const runtime = "nodejs";
@@ -10,21 +13,27 @@ export async function POST(req: Request) {
     return Response.json({ error: "vendorName required" }, { status: 400 });
   }
 
-  const progress: string[] = [];
+  const id = randomUUID();
+  await createJob(id, vendorName);
 
-  try {
-    const report = await runAgent(vendorName, (message) => {
-      progress.push(message);
-    });
-    return Response.json({ status: "done", report, progress });
-  } catch (err) {
-    return Response.json(
-      {
-        status: "error",
-        error: err instanceof Error ? err.message : "Unknown error",
-        progress,
-      },
-      { status: 500 }
-    );
-  }
+  waitUntil(
+    (async () => {
+      await updateJob(id, { status: "running" });
+      const progress: string[] = [];
+      try {
+        const report = await runAgent(vendorName, (message) => {
+          progress.push(message);
+        });
+        await updateJob(id, { status: "done", report, progress });
+      } catch (err) {
+        await updateJob(id, {
+          status: "error",
+          error: err instanceof Error ? err.message : "Unknown error",
+          progress,
+        });
+      }
+    })()
+  );
+
+  return Response.json({ id });
 }

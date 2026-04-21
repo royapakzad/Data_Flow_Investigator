@@ -29,7 +29,8 @@ export interface Source {
   url: string;
 }
 
-// Structured data flow node for the layered diagram
+// ── Data Flow ─────────────────────────────────────────────────────────────────
+
 export type NodeLayer =
   | "upstream-infra"
   | "upstream-analytics"
@@ -42,23 +43,62 @@ export type NodeLayer =
   | "downstream-state";
 
 export interface DataFlowNode {
-  id: string;            // unique slug, e.g. "aws", "powerschool"
-  name: string;          // display name
+  id: string;
+  name: string;
   layer: NodeLayer;
-  description: string;   // one-line role description
-  dataTypes: string[];   // student data that flows through this node
-  url?: string;          // link to their privacy page
+  description: string;
+  dataTypes: string[];
+  url?: string;
   country?: string;
   source: "declared" | "detected" | "inferred";
 }
 
-// Numbered citation for clickable references
+// ── Citations ─────────────────────────────────────────────────────────────────
+
 export interface Citation {
   number: number;
   label: string;
   url: string;
-  context: string;       // what was actually found at this source
+  context: string;
 }
+
+// ── Company Ownership & Acquisitions ─────────────────────────────────────────
+
+export interface AcquisitionEvent {
+  year: number;
+  acquirer: string;       // company that did the buying
+  acquired: string;       // company that was bought
+  description: string;    // one sentence summary
+  sourceUrl: string;      // MUST be a real, verifiable URL (news article, press release, SEC filing)
+  sourceLabel: string;    // e.g. "TechCrunch", "SEC EDGAR", "Company Blog"
+}
+
+export interface CompanyOwnership {
+  currentParentCompany: string | null;
+  currentParentUrl: string | null;    // homepage or Wikipedia URL of parent company
+  currentParentDescription: string | null;
+  foundedYear: number | null;
+  founders: string[];
+  acquisitionHistory: AcquisitionEvent[]; // empty array if none found — never invent
+  ownershipNotes: string;               // any additional verified context
+}
+
+// ── Reddit Posts ──────────────────────────────────────────────────────────────
+
+export interface RedditPost {
+  id: string;
+  title: string;
+  subreddit: string;
+  permalink: string;      // full reddit.com URL
+  author: string;
+  score: number;
+  numComments: number;
+  createdUtc: number;     // unix timestamp
+  flair: string | null;
+  preview: string | null; // first ~200 chars of self-text, if available
+}
+
+// ── Main Report ───────────────────────────────────────────────────────────────
 
 export interface VendorReport {
   vendorName: string;
@@ -83,13 +123,11 @@ export interface VendorReport {
   trackers: Tracker[];
   discrepancies: Discrepancy[];
   vendorQuestions: string[];
-  // Structured data flow — used to build the diagram
   dataFlowNodes: DataFlowNode[];
-  // Numbered, clickable citations
   citations: Citation[];
+  companyOwnership: CompanyOwnership;
   humanInLoopSteps: string[];
-  // Legacy fields kept for backward compat — populated from dataFlowNodes
-  diagramCode?: string;
+  diagramCode?: string;   // built programmatically from dataFlowNodes
   sources?: Source[];
   rawNotes?: string;
 }

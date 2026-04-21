@@ -5,6 +5,8 @@ import { MetricCards } from "./MetricCards";
 import { MermaidDiagram } from "./MermaidDiagram";
 import { DiscrepancyList } from "./DiscrepancyList";
 import { SubprocessorTable } from "./SubprocessorTable";
+import { CompanyHistory } from "./CompanyHistory";
+import { RedditPosts } from "./RedditPosts";
 
 interface Props {
   report: VendorReport;
@@ -186,6 +188,13 @@ export function AnalysisReport({ report }: Props) {
         )}
       </div>
 
+      {/* Company ownership */}
+      {report.companyOwnership && (
+        <Section title="Company Ownership & Acquisition History">
+          <CompanyHistory ownership={report.companyOwnership} />
+        </Section>
+      )}
+
       {/* Metric cards */}
       <MetricCards report={report} />
 
@@ -307,6 +316,15 @@ export function AnalysisReport({ report }: Props) {
             ))}
           </ul>
         </div>
+      </Section>
+
+      {/* Reddit community discussion */}
+      <Section title="Reddit Community Discussion">
+        <p className="text-xs text-slate-500 mb-3">
+          Live posts from Reddit — pulled directly from Reddit's API, not AI-generated. Prioritises
+          early childhood education and edtech subreddits.
+        </p>
+        <RedditPosts vendorName={report.vendorName} />
       </Section>
 
       {/* Citations */}
