@@ -192,7 +192,7 @@ export async function runAgent(
   onProgress: (msg: string) => void
 ): Promise<VendorReport> {
   const model = client.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     systemInstruction: SYSTEM_PROMPT,
     tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
     toolConfig: { functionCallingConfig: { mode: FunctionCallingMode.AUTO } },
