@@ -30,14 +30,27 @@ export default function Home() {
         body: JSON.stringify({ vendorName: name.trim() }),
       });
 
+      const data = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? `Server error ${res.status}`);
       }
 
-      const { id } = await res.json();
+      // Mode B (no Redis): response contains the full result immediately
+      if (data.status === "done") {
+        if (data.progress?.length) setProgressLog(data.progress);
+        setReport(data.report);
+        setLoading(false);
+        return;
+      }
+      if (data.status === "error") {
+        throw new Error(data.error ?? "Unknown error");
+      }
 
-      // Poll /api/analyze/[id] every 2 seconds until done
+      // Mode A (Redis configured): response contains { id }, start polling
+      const { id } = data;
+      if (!id) throw new Error("Unexpected server response");
+
       pollRef.current = setInterval(async () => {
         try {
           const poll = await fetch(`/api/analyze/${id}`);
