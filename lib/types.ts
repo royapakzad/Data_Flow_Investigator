@@ -3,10 +3,11 @@ export type RiskLevel = "elevated" | "standard" | "low-concern";
 export interface Subprocessor {
   name: string;
   purpose: string;
-  category: "analytics" | "infrastructure" | "payments" | "auth" | "ads" | "support" | "other";
+  category: "analytics" | "infrastructure" | "payments" | "auth" | "ads" | "support" | "ai-ml" | "video" | "communication" | "other";
   dataTypes: string[];
   country?: string;
   privacyUrl?: string;
+  disclosedIn?: string | null;  // where this dependency was found (e.g. "App Store privacy label", "Play Store Data Safety", "DPA", "Trust Center", "Exodus")
   source: "declared" | "detected" | "inferred";
 }
 

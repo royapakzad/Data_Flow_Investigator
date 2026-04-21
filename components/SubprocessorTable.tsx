@@ -8,6 +8,9 @@ const CATEGORY_COLORS: Record<Subprocessor["category"], string> = {
   payments:       "bg-green-500/20 text-green-300",
   auth:           "bg-yellow-500/20 text-yellow-300",
   support:        "bg-blue-500/20 text-blue-300",
+  "ai-ml":        "bg-pink-500/20 text-pink-300",
+  video:          "bg-cyan-500/20 text-cyan-300",
+  communication:  "bg-teal-500/20 text-teal-300",
   other:          "bg-slate-600/50 text-slate-300",
 };
 
@@ -48,6 +51,7 @@ export function SubprocessorTable({ report, citations = [] }: Props) {
             <th className="px-4 py-3 text-left font-medium text-slate-400">Purpose</th>
             <th className="px-4 py-3 text-left font-medium text-slate-400">Category</th>
             <th className="px-4 py-3 text-left font-medium text-slate-400">Data Types</th>
+            <th className="px-4 py-3 text-left font-medium text-slate-400">Disclosed In</th>
             <th className="px-4 py-3 text-left font-medium text-slate-400">Source</th>
           </tr>
         </thead>
@@ -99,6 +103,9 @@ export function SubprocessorTable({ report, citations = [] }: Props) {
                 </td>
                 <td className="px-4 py-3 text-slate-400 text-xs">
                   {s.dataTypes.join(", ")}
+                </td>
+                <td className="px-4 py-3 text-slate-400 text-xs">
+                  {s.disclosedIn ?? <span className="text-slate-600">—</span>}
                 </td>
                 <td className="px-4 py-3">
                   <span className={clsx("px-2 py-0.5 rounded text-xs", SOURCE_BADGE[s.source])}>

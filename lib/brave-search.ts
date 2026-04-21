@@ -17,6 +17,7 @@ export async function braveSearch(query: string, count = 5): Promise<SearchResul
       "Accept-Encoding": "gzip",
       "X-Subscription-Token": apiKey,
     },
+    signal: AbortSignal.timeout(10000),
   });
 
   if (!res.ok) throw new Error(`Brave Search error: ${res.status}`);

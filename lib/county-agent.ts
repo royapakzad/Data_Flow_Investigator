@@ -4,6 +4,32 @@ import type { CountyReport } from "./types";
 
 const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 3, baseMs = 3000): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (attempt < maxAttempts - 1) await sleep(baseMs * Math.pow(2, attempt));
+    }
+  }
+  throw lastErr;
+}
+
+function extractJSON(text: string): string {
+  const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+  if (fenceMatch) return fenceMatch[1].trim();
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start !== -1 && end > start) return text.slice(start, end + 1);
+  return text.trim();
+}
+
 const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: "search_web",
@@ -224,44 +250,46 @@ export async function runCountyAgent(
   });
 
   const chat = model.startChat();
-  onProgress(`Starting investigation of ${countyName} County, ${stateName}...`);
+  onProgress(`Starting investigation of ${countyName} County, ${stateName}…`);
 
-  let result = await chat.sendMessage(
-    `Investigate the public education data integration systems serving ${countyName} County, ${stateName} (${stateAbbr}), FIPS code ${fipsCode}. ` +
-    `Research the state's SLDS/P-20W system, ECIDS, Kindergarten Entry Assessment policy, cross-sector data linkages (workforce/LER, health, justice, military, migration), ` +
-    `and applicable data safeguards. Find and verify the vendors and technology companies that built or operate these systems. ` +
-    `Output the full JSON report.`
+  let result = await withRetry(() =>
+    chat.sendMessage(
+      `Investigate the public education data integration systems serving ${countyName} County, ${stateName} (${stateAbbr}), FIPS code ${fipsCode}. ` +
+      `Research the state's SLDS/P-20W system, ECIDS, Kindergarten Entry Assessment policy, cross-sector data linkages (workforce/LER, health, justice, military, migration), ` +
+      `and applicable data safeguards. Find and verify the vendors and technology companies that built or operate these systems. ` +
+      `Output the full JSON report.`
+    )
   );
 
   const MAX_ITERATIONS = 35;
+  let stepCount = 0;
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     const response = result.response;
     const functionCalls = response.functionCalls();
 
     if (!functionCalls?.length) {
-      let jsonStr = response.text().trim();
-      if (jsonStr.startsWith("```")) {
-        jsonStr = jsonStr.replace(/^```[a-z]*\n?/, "").replace(/\n?```$/, "");
-      }
+      onProgress("Compiling final report…");
+      const jsonStr = extractJSON(response.text());
       const report = JSON.parse(jsonStr) as CountyReport;
       report.analysisDate = new Date().toISOString();
       return report;
     }
 
-    const toolResponses = [];
+    const toolResponses: Array<{ functionResponse: { name: string; response: { result: string } } }> = [];
     for (const call of functionCalls) {
+      stepCount++;
       const toolName = call.name;
       const toolInput = call.args as Record<string, unknown>;
       const progressMsg =
-        toolName === "search_web" ? `Searching: "${toolInput.query}"` :
-        toolName === "fetch_page" ? `Fetching: ${toolInput.url}` :
-        `Running ${toolName}`;
+        toolName === "search_web" ? `[${stepCount}] Searching: "${toolInput.query}"` :
+        toolName === "fetch_page" ? `[${stepCount}] Fetching: ${toolInput.url}` :
+        `[${stepCount}] Running ${toolName}`;
       onProgress(progressMsg);
       const output = await executeTool(toolName, toolInput);
       toolResponses.push({ functionResponse: { name: toolName, response: { result: output } } });
     }
-    result = await chat.sendMessage(toolResponses);
+    result = await withRetry(() => chat.sendMessage(toolResponses));
   }
 
   throw new Error("Agent exceeded maximum iterations");

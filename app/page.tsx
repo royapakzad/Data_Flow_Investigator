@@ -8,6 +8,83 @@ import { AnalysisReport } from "@/components/AnalysisReport";
 import { CountyReport as CountyReportView } from "@/components/CountyReport";
 import { ReportActions } from "@/components/ReportActions";
 
+// ── Progress panel ────────────────────────────────────────────────────────────
+
+const ESTIMATED_STEPS = { vendor: 22, county: 28 };
+
+function ProgressPanel({
+  log,
+  mode,
+  onCancel,
+}: {
+  log: string[];
+  mode: "vendor" | "county";
+  onCancel: () => void;
+}) {
+  const total = ESTIMATED_STEPS[mode];
+  // Extract step number from messages like "[12] Searching: ..."
+  const lastNumbered = [...log].reverse().find((m) => m.match(/^\[(\d+)\]/));
+  const current = lastNumbered ? parseInt(lastNumbered.match(/^\[(\d+)\]/)![1]) : 0;
+  const pct = Math.min(95, Math.round((current / total) * 100));
+  const isCompiling = log[log.length - 1] === "Compiling final report…";
+  const currentLabel = log[log.length - 1] ?? "Initializing…";
+  // Strip the [N] prefix for display
+  const displayLabel = currentLabel.replace(/^\[\d+\]\s*/, "");
+  // Last 4 completed steps (excluding current)
+  const history = log.slice(-5, -1).reverse();
+
+  return (
+    <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-5 space-y-4 no-print">
+      {/* Header row */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin shrink-0" />
+          <span className="text-slate-200 text-sm font-semibold">
+            {isCompiling ? "Compiling report…" : "Agent is investigating"}
+          </span>
+        </div>
+        <button
+          onClick={onCancel}
+          className="text-xs text-slate-500 hover:text-slate-300 transition-colors px-2 py-1 rounded hover:bg-slate-700"
+        >
+          Cancel
+        </button>
+      </div>
+
+      {/* Progress bar */}
+      <div className="space-y-1.5">
+        <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+          <span>{isCompiling ? "Generating JSON output…" : `Step ${current} of ~${total}`}</span>
+          <span>{isCompiling ? "95%" : `${pct}%`}</span>
+        </div>
+        <div className="h-1.5 rounded-full bg-slate-700 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-blue-500 transition-all duration-700"
+            style={{ width: `${isCompiling ? 95 : pct}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Current step */}
+      <div className="rounded-xl bg-slate-900/60 border border-slate-700 px-4 py-3">
+        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Current</p>
+        <p className="text-slate-200 text-sm leading-snug font-mono break-all">{displayLabel}</p>
+      </div>
+
+      {/* Recent history */}
+      {history.length > 0 && (
+        <div className="space-y-1">
+          {history.map((msg, i) => (
+            <p key={i} className="text-[11px] text-slate-600 font-mono truncate pl-1">
+              {msg.replace(/^\[\d+\]\s*/, "")}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // react-simple-maps uses browser SVG APIs — load client-side only
 const USCountyMap = dynamic(
   () => import("@/components/USCountyMap").then((m) => ({ default: m.USCountyMap })),
@@ -32,20 +109,32 @@ const VENDOR_EXAMPLES = ["ClassDojo", "Seesaw", "Remind", "Canvas LMS", "Duoling
 
 // ── Vendor Analyzer tab ───────────────────────────────────────────────────────
 
+const MAX_AUTO_RETRIES = 2;
+
 function VendorAnalyzer() {
   const [vendorName, setVendorName] = useState("");
   const [loading, setLoading] = useState(false);
   const [progressLog, setProgressLog] = useState<string[]>([]);
   const [report, setReport] = useState<VendorReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const cancelledRef = useRef(false);
 
-  async function analyze(name: string) {
+  function cancel() {
+    cancelledRef.current = true;
+    if (pollRef.current) clearInterval(pollRef.current);
+    setLoading(false);
+  }
+
+  async function analyze(name: string, attemptNum = 1) {
     if (!name.trim()) return;
+    cancelledRef.current = false;
     setLoading(true);
     setReport(null);
     setError(null);
-    setProgressLog([]);
+    setAttempt(attemptNum);
+    if (attemptNum === 1) setProgressLog([]);
     if (pollRef.current) clearInterval(pollRef.current);
 
     try {
@@ -69,6 +158,7 @@ function VendorAnalyzer() {
       if (!id) throw new Error("Unexpected server response");
 
       pollRef.current = setInterval(async () => {
+        if (cancelledRef.current) return;
         try {
           const poll = await fetch(`/api/analyze/${id}`);
           if (!poll.ok) return;
@@ -80,19 +170,35 @@ function VendorAnalyzer() {
             setLoading(false);
           } else if (job.status === "error") {
             clearInterval(pollRef.current!);
-            setError(job.error ?? "Unknown error");
+            throw new Error(job.error ?? "Unknown error");
+          }
+        } catch (pollErr) {
+          clearInterval(pollRef.current!);
+          const msg = pollErr instanceof Error ? pollErr.message : "Unknown error";
+          if (!cancelledRef.current && attemptNum <= MAX_AUTO_RETRIES) {
+            setProgressLog((prev) => [...prev, `Retrying (attempt ${attemptNum + 1})…`]);
+            await analyze(name, attemptNum + 1);
+          } else {
+            setError(msg);
             setLoading(false);
           }
-        } catch { /* retry next tick */ }
+        }
       }, 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      if (cancelledRef.current) return;
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      if (attemptNum <= MAX_AUTO_RETRIES) {
+        setProgressLog((prev) => [...prev, `Network error — retrying (attempt ${attemptNum + 1})…`]);
+        await new Promise((r) => setTimeout(r, 2000 * attemptNum));
+        return analyze(name, attemptNum + 1);
+      }
+      setError(msg);
       setLoading(false);
     }
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <p className="text-slate-400 max-w-2xl leading-relaxed no-print">
         Enter an edtech vendor or app name. The AI agent investigates their privacy policy,
         subprocessor chain, detected trackers, and company ownership — so you can ask the right
@@ -109,17 +215,10 @@ function VendorAnalyzer() {
             disabled={loading}
             className="flex-1 px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 disabled:opacity-50 transition-colors"
           />
-          {loading ? (
-            <button type="button" onClick={() => { if (pollRef.current) clearInterval(pollRef.current); setLoading(false); }}
-              className="px-5 py-3 rounded-xl bg-slate-700 text-slate-300 font-medium hover:bg-slate-600 transition-colors">
-              Cancel
-            </button>
-          ) : (
-            <button type="submit" disabled={!vendorName.trim()}
-              className="px-6 py-3 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-              Analyze
-            </button>
-          )}
+          <button type="submit" disabled={loading || !vendorName.trim()}
+            className="px-6 py-3 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            Analyze
+          </button>
         </div>
         <div className="flex gap-2 flex-wrap">
           {VENDOR_EXAMPLES.map((ex) => (
@@ -133,28 +232,21 @@ function VendorAnalyzer() {
       </form>
 
       {loading && (
-        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5 space-y-3 no-print">
-          <div className="flex items-center gap-3">
-            <div className="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
-            <span className="text-slate-300 text-sm font-medium">Agent is investigating…</span>
-          </div>
-          <div className="space-y-1 max-h-48 overflow-y-auto">
-            {progressLog.map((msg, i) => (
-              <p key={i} className="text-xs text-slate-500 font-mono">
-                <span className="text-slate-600 mr-2">{String(i + 1).padStart(2, "0")}</span>
-                {msg}
-              </p>
-            ))}
-          </div>
-        </div>
+        <ProgressPanel
+          log={progressLog}
+          mode="vendor"
+          onCancel={cancel}
+        />
       )}
 
       {error && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-sm space-y-3 no-print">
-          <p className="text-red-300"><strong>Error:</strong> {error}</p>
+          <p className="text-red-300">
+            <strong>Error after {attempt} attempt{attempt > 1 ? "s" : ""}:</strong> {error}
+          </p>
           <button onClick={() => analyze(vendorName)}
             className="px-4 py-2 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm hover:bg-red-500/30 transition-colors">
-            Retry
+            Try again
           </button>
         </div>
       )}
@@ -166,7 +258,7 @@ function VendorAnalyzer() {
         </div>
       )}
 
-      {!loading && !report && (
+      {!loading && !report && !error && (
         <p className="text-center text-xs text-slate-600 max-w-xl mx-auto">
           Automated analysis of public disclosures. Does not perform dynamic traffic interception or
           legal interpretation of data processing agreements. Verify findings before procurement decisions.
@@ -184,14 +276,24 @@ function CountyExplorer() {
   const [progressLog, setProgressLog] = useState<string[]>([]);
   const [report, setReport] = useState<CountyReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const cancelledRef = useRef(false);
 
-  async function investigateCounty(county: CountyInfo) {
+  function cancel() {
+    cancelledRef.current = true;
+    if (pollRef.current) clearInterval(pollRef.current);
+    setLoading(false);
+  }
+
+  async function investigateCounty(county: CountyInfo, attemptNum = 1) {
+    cancelledRef.current = false;
     setSelectedCounty(county);
     setLoading(true);
     setReport(null);
     setError(null);
-    setProgressLog([]);
+    setAttempt(attemptNum);
+    if (attemptNum === 1) setProgressLog([]);
     if (pollRef.current) clearInterval(pollRef.current);
 
     try {
@@ -220,6 +322,7 @@ function CountyExplorer() {
       if (!id) throw new Error("Unexpected server response");
 
       pollRef.current = setInterval(async () => {
+        if (cancelledRef.current) return;
         try {
           const poll = await fetch(`/api/county/${id}`);
           if (!poll.ok) return;
@@ -231,13 +334,29 @@ function CountyExplorer() {
             setLoading(false);
           } else if (job.status === "error") {
             clearInterval(pollRef.current!);
-            setError(job.error ?? "Unknown error");
+            throw new Error(job.error ?? "Unknown error");
+          }
+        } catch (pollErr) {
+          clearInterval(pollRef.current!);
+          const msg = pollErr instanceof Error ? pollErr.message : "Unknown error";
+          if (!cancelledRef.current && attemptNum <= MAX_AUTO_RETRIES) {
+            setProgressLog((prev) => [...prev, `Retrying (attempt ${attemptNum + 1})…`]);
+            await investigateCounty(county, attemptNum + 1);
+          } else {
+            setError(msg);
             setLoading(false);
           }
-        } catch { /* retry next tick */ }
+        }
       }, 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      if (cancelledRef.current) return;
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      if (attemptNum <= MAX_AUTO_RETRIES) {
+        setProgressLog((prev) => [...prev, `Network error — retrying (attempt ${attemptNum + 1})…`]);
+        await new Promise((r) => setTimeout(r, 2000 * attemptNum));
+        return investigateCounty(county, attemptNum + 1);
+      }
+      setError(msg);
       setLoading(false);
     }
   }
@@ -252,44 +371,34 @@ function CountyExplorer() {
       </p>
 
       <USCountyMap
-        onCountySelect={investigateCounty}
+        onCountySelect={(c) => investigateCounty(c)}
         selectedFips={selectedCounty?.fips}
         loading={loading}
       />
 
-      {selectedCounty && !report && (
-        <div className="text-center text-xs text-slate-500 no-print">
+      {selectedCounty && !report && !loading && (
+        <p className="text-center text-xs text-slate-500 no-print">
           Selected: <span className="text-slate-300 font-medium">{selectedCounty.name} County, {selectedCounty.stateName}</span>
-          {loading && " · Investigating…"}
-        </div>
+        </p>
       )}
 
       {loading && (
-        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5 space-y-3 no-print">
-          <div className="flex items-center gap-3">
-            <div className="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
-            <span className="text-slate-300 text-sm font-medium">
-              Investigating {selectedCounty?.name} County, {selectedCounty?.stateName}…
-            </span>
-          </div>
-          <div className="space-y-1 max-h-48 overflow-y-auto">
-            {progressLog.map((msg, i) => (
-              <p key={i} className="text-xs text-slate-500 font-mono">
-                <span className="text-slate-600 mr-2">{String(i + 1).padStart(2, "0")}</span>
-                {msg}
-              </p>
-            ))}
-          </div>
-        </div>
+        <ProgressPanel
+          log={progressLog}
+          mode="county"
+          onCancel={cancel}
+        />
       )}
 
       {error && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-sm space-y-3 no-print">
-          <p className="text-red-300"><strong>Error:</strong> {error}</p>
+          <p className="text-red-300">
+            <strong>Error after {attempt} attempt{attempt > 1 ? "s" : ""}:</strong> {error}
+          </p>
           {selectedCounty && (
             <button onClick={() => investigateCounty(selectedCounty)}
               className="px-4 py-2 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm hover:bg-red-500/30 transition-colors">
-              Retry
+              Try again
             </button>
           )}
         </div>
