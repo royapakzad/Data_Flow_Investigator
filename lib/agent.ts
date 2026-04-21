@@ -2,6 +2,7 @@ import { GoogleGenerativeAI, SchemaType, FunctionCallingMode, type FunctionDecla
 import { braveSearch } from "./brave-search";
 import { lookupExodus } from "./exodus";
 import { lookupAppStore } from "./appstore";
+import { buildMermaidDiagram } from "./diagram";
 import type { VendorReport } from "./types";
 
 const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -60,16 +61,26 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
 
 const SYSTEM_PROMPT = `You are a data privacy investigator helping schools and districts evaluate edtech vendor data practices.
 
-Given a vendor/app name, you will:
-1. Search for their privacy policy, data processing agreement (DPA), and subprocessor list
-2. Fetch those documents and extract key information
-3. Check Exodus Privacy for detected Android trackers
-4. Check the App Store for declared data practices
-5. Identify discrepancies between declared and detected practices
-6. Generate a data flow diagram in Mermaid syntax
-7. Generate specific vendor questions
+Given a vendor/app name, investigate the FULL data flow — both upstream (services the app depends on) AND downstream (education systems student data eventually reaches).
 
-Be thorough but efficient. Make 8-15 tool calls total. After gathering data, output a JSON object matching this schema exactly:
+RESEARCH PLAN (12-18 tool calls):
+
+UPSTREAM RESEARCH:
+1. Fetch privacy policy and subprocessor list — extract cloud infrastructure, analytics, auth, and advertising vendors
+2. Search for "[vendor] AWS Google Cloud infrastructure" to identify hosting providers
+3. Search for "[vendor] analytics trackers SDK" to find analytics/tracking dependencies
+4. Check Exodus Privacy for Android SDK trackers
+5. Check App Store for declared data practices
+
+DOWNSTREAM RESEARCH (critical — most tools skip this):
+6. Search "[vendor] Clever integration" and "[vendor] ClassLink integration" — rostering/SSO connections
+7. Search "[vendor] Google Classroom Canvas LMS integration" — LMS connections
+8. Search "[vendor] PowerSchool Infinite Campus SIS integration" — Student Information System connections
+9. Search "[vendor] student data rostering OneRoster" — data standard connections
+10. Search "[vendor] state education data FERPA" — state/federal data system connections
+11. Fetch any integration pages you find (e.g. vendor's "Integrations" or "Partners" page)
+
+After gathering data, output a JSON object matching this schema EXACTLY:
 
 {
   "vendorName": string,
@@ -118,32 +129,54 @@ Be thorough but efficient. Make 8-15 tool calls total. After gathering data, out
     }
   ],
   "vendorQuestions": string[],
-  "diagramCode": string,
   "humanInLoopSteps": string[],
-  "sources": [{ "label": string, "url": string }],
+
+  "dataFlowNodes": [
+    {
+      "id": string,              // unique slug, e.g. "aws", "powerschool", "clever"
+      "name": string,            // display name
+      "layer": "upstream-infra" | "upstream-analytics" | "upstream-ads" | "upstream-auth" | "app" | "integration-rostering" | "integration-lms" | "downstream-sis" | "downstream-state",
+      "description": string,     // one-line role, e.g. "Cloud Hosting" or "Student Rostering & SSO"
+      "dataTypes": string[],     // student data flowing through: e.g. ["student names", "usage data"]
+      "url": string | null,      // privacy page URL
+      "country": string | null,
+      "source": "declared" | "detected" | "inferred"
+    }
+  ],
+
+  "citations": [
+    {
+      "number": number,          // 1-based sequential
+      "label": string,           // e.g. "ClassDojo Privacy Policy"
+      "url": string,
+      "context": string          // one sentence: what key finding came from this source
+    }
+  ],
+
   "rawNotes": string
 }
 
-For diagramCode, generate a valid Mermaid flowchart. Example format:
-flowchart TD
-    App[VendorApp\\nStudent Data] --> AWS[AWS\\nCloud Hosting]
-    App --> Google[Google Analytics\\nUsage Tracking]
-    style App fill:#3b82f6,color:#fff
-    style Google fill:#ef4444,color:#fff
+LAYER DEFINITIONS for dataFlowNodes — assign each node to exactly one layer:
+- "upstream-infra"        : Cloud hosting, CDN, databases (AWS, GCP, Azure, Cloudflare, Fastly)
+- "upstream-analytics"    : Analytics, session recording, error tracking (Google Analytics, Amplitude, Mixpanel, Segment, Firebase, Sentry, Datadog, Heap)
+- "upstream-ads"          : Advertising, marketing (Facebook SDK, Meta Pixel, Google Ads, DoubleClick, AppsFlyer)
+- "upstream-auth"         : Authentication, identity (Google OAuth, Apple Sign-In, Auth0, Okta)
+- "app"                   : The vendor/app itself — ALWAYS include exactly one node here
+- "integration-rostering" : Rostering, SSO, provisioning (Clever, ClassLink, OneRoster, LTI, Canvas Network)
+- "integration-lms"       : Learning Management Systems (Google Classroom, Canvas by Instructure, Schoology, Blackboard, Moodle, Brightspace)
+- "downstream-sis"        : Student Information Systems (PowerSchool, Infinite Campus, Skyward, Aeries, Aspen/X2, Synergy, Frontline)
+- "downstream-state"      : State/federal education data systems (State DOE data warehouse, Ed-Fi Alliance, CEDS, SIF Association, ESSA reporting)
 
-Color conventions:
-- App itself: #3b82f6 (blue)
-- Analytics/ads: #ef4444 (red)
-- Infrastructure: #8b5cf6 (purple)
-- Auth/identity: #f59e0b (amber)
-- Support: #10b981 (green)
-- Other: #6b7280 (gray)
+IMPORTANT RULES:
+- Always include AT LEAST one node for the app layer
+- Include downstream-sis and downstream-state nodes even if inferred — if a vendor integrates with Clever, Clever feeds SIS data, so include PowerSchool/Infinite Campus as inferred downstream nodes
+- If you find NO integration evidence, still include generic "downstream-sis" node labeled "Connected SIS (via rostering)" as inferred
+- dataFlowNodes should have 8-20 total nodes covering all relevant layers
+- citations should have 5-12 entries — every major finding must cite a source
+- For each citation, context must explain specifically what was found there
 
-For vendorQuestions: generate 5-7 specific, pointed questions a procurement officer should send to the vendor, based on actual gaps found in the analysis.
-
-For humanInLoopSteps: list 3-5 steps a human analyst should take that the automated analysis cannot do (dynamic traffic capture, legal review of DPA clauses, etc.).
-
-Estimate downstream vendors by looking up 2-3 major subprocessors' own subprocessor lists if possible.
+For vendorQuestions: 5-7 specific, pointed questions for a procurement officer based on actual gaps found.
+For humanInLoopSteps: 3-5 steps requiring human verification (dynamic traffic capture, DPA legal review, etc.).
 
 Output ONLY the JSON object. No markdown fences, no explanation.`;
 
@@ -192,7 +225,7 @@ export async function runAgent(
   onProgress: (msg: string) => void
 ): Promise<VendorReport> {
   const model = client.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: "gemini-2.5-flash-preview-04-17",
     systemInstruction: SYSTEM_PROMPT,
     tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
     toolConfig: { functionCallingConfig: { mode: FunctionCallingMode.AUTO } },
@@ -224,6 +257,10 @@ export async function runAgent(
 
       const report = JSON.parse(jsonStr) as VendorReport;
       report.analysisDate = new Date().toISOString();
+      // Build diagram from structured nodes (guaranteed valid Mermaid)
+      if (report.dataFlowNodes?.length) {
+        report.diagramCode = buildMermaidDiagram(report.dataFlowNodes, report.vendorName);
+      }
       return report;
     }
 

@@ -1,3 +1,4 @@
+import { Redis } from "@upstash/redis";
 import type { VendorReport } from "./types";
 
 export type JobStatus = "pending" | "running" | "done" | "error";
@@ -12,34 +13,25 @@ export interface Job {
   createdAt: number;
 }
 
-// Use a global so the Map survives Next.js dev-mode hot reloads and
-// cross-route module isolation (each route gets its own module instance).
-declare global {
-  // eslint-disable-next-line no-var
-  var __jobStore: Map<string, Job> | undefined;
-}
-if (!global.__jobStore) {
-  global.__jobStore = new Map<string, Job>();
-  setInterval(() => {
-    const cutoff = Date.now() - 30 * 60 * 1000;
-    global.__jobStore!.forEach((job, id) => {
-      if (job.createdAt < cutoff) global.__jobStore!.delete(id);
-    });
-  }, 10 * 60 * 1000);
-}
-const jobs = global.__jobStore;
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
 
-export function createJob(id: string, vendorName: string): Job {
+const TTL = 3600; // 1 hour
+
+export async function createJob(id: string, vendorName: string): Promise<Job> {
   const job: Job = { id, status: "pending", vendorName, progress: [], createdAt: Date.now() };
-  jobs.set(id, job);
+  await redis.set(`job:${id}`, job, { ex: TTL });
   return job;
 }
 
-export function getJob(id: string): Job | undefined {
-  return jobs.get(id);
+export async function getJob(id: string): Promise<Job | undefined> {
+  const job = await redis.get<Job>(`job:${id}`);
+  return job ?? undefined;
 }
 
-export function updateJob(id: string, update: Partial<Job>) {
-  const job = jobs.get(id);
-  if (job) jobs.set(id, { ...job, ...update });
+export async function updateJob(id: string, update: Partial<Job>): Promise<void> {
+  const job = await redis.get<Job>(`job:${id}`);
+  if (job) await redis.set(`job:${id}`, { ...job, ...update }, { ex: TTL });
 }

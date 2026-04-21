@@ -29,6 +29,37 @@ export interface Source {
   url: string;
 }
 
+// Structured data flow node for the layered diagram
+export type NodeLayer =
+  | "upstream-infra"
+  | "upstream-analytics"
+  | "upstream-auth"
+  | "upstream-ads"
+  | "app"
+  | "integration-rostering"
+  | "integration-lms"
+  | "downstream-sis"
+  | "downstream-state";
+
+export interface DataFlowNode {
+  id: string;            // unique slug, e.g. "aws", "powerschool"
+  name: string;          // display name
+  layer: NodeLayer;
+  description: string;   // one-line role description
+  dataTypes: string[];   // student data that flows through this node
+  url?: string;          // link to their privacy page
+  country?: string;
+  source: "declared" | "detected" | "inferred";
+}
+
+// Numbered citation for clickable references
+export interface Citation {
+  number: number;
+  label: string;
+  url: string;
+  context: string;       // what was actually found at this source
+}
+
 export interface VendorReport {
   vendorName: string;
   appName: string;
@@ -52,9 +83,14 @@ export interface VendorReport {
   trackers: Tracker[];
   discrepancies: Discrepancy[];
   vendorQuestions: string[];
-  diagramCode: string;
+  // Structured data flow — used to build the diagram
+  dataFlowNodes: DataFlowNode[];
+  // Numbered, clickable citations
+  citations: Citation[];
   humanInLoopSteps: string[];
-  sources: Source[];
+  // Legacy fields kept for backward compat — populated from dataFlowNodes
+  diagramCode?: string;
+  sources?: Source[];
   rawNotes?: string;
 }
 
