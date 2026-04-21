@@ -12,57 +12,45 @@ export default function Home() {
   const [progressLog, setProgressLog] = useState<string[]>([]);
   const [report, setReport] = useState<VendorReport | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   async function analyze(name: string) {
     if (!name.trim()) return;
 
-    // Reset state
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setLoading(true);
     setReport(null);
     setError(null);
-    setProgressLog([]);
-    if (pollRef.current) clearInterval(pollRef.current);
+    setProgressLog([`Starting investigation of "${name.trim()}"...`]);
 
     try {
-      // Start the job — returns immediately with an ID
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ vendorName: name.trim() }),
+        signal: controller.signal,
       });
 
+      const data = await res.json().catch(() => ({}));
+
+      if (data.progress?.length) setProgressLog(data.progress);
+
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? `Server error ${res.status}`);
       }
 
-      const { id } = await res.json();
-
-      // Poll /api/analyze/[id] every 2 seconds
-      pollRef.current = setInterval(async () => {
-        try {
-          const poll = await fetch(`/api/analyze/${id}`);
-          if (!poll.ok) return; // retry next tick
-
-          const job = await poll.json();
-          setProgressLog(job.progress ?? []);
-
-          if (job.status === "done") {
-            clearInterval(pollRef.current!);
-            setReport(job.report);
-            setLoading(false);
-          } else if (job.status === "error") {
-            clearInterval(pollRef.current!);
-            setError(job.error ?? "Unknown error");
-            setLoading(false);
-          }
-        } catch {
-          // Network hiccup — retry next tick
-        }
-      }, 2000);
+      if (data.status === "done") {
+        setReport(data.report);
+      } else {
+        throw new Error(data.error ?? "Unknown error");
+      }
     } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
       setLoading(false);
     }
   }
@@ -73,7 +61,7 @@ export default function Home() {
   }
 
   function handleCancel() {
-    if (pollRef.current) clearInterval(pollRef.current);
+    abortRef.current?.abort();
     setLoading(false);
   }
 
