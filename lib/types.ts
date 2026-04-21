@@ -137,6 +137,73 @@ export interface AnalyzeRequest {
   appStoreUrl?: string;
 }
 
+// ── County Education Data System Types ────────────────────────────────────────
+
+export interface EduSystemVendor {
+  name: string;
+  role: string;                      // "Primary developer" | "Integration partner" | "Hosting" | etc.
+  website: string | null;
+  contractType: "awarded" | "in-house" | "partnership" | "unknown";
+  notes: string | null;
+}
+
+export type EduSystemType = "SLDS" | "ECIDS" | "KEA" | "SIS" | "federal" | "cross-sector" | "other";
+
+export interface EduDataSystem {
+  name: string;
+  type: EduSystemType;
+  scope: "county-district" | "state" | "federal";
+  description: string;
+  status: "active" | "planned" | "discontinued" | "unknown";
+  dataElements: string[];
+  vendors: EduSystemVendor[];
+  url: string | null;
+  citationNumbers: number[];
+  source: "declared" | "inferred";
+}
+
+export type CrossSectorType = "workforce-LER" | "health" | "justice" | "military" | "migration" | "other";
+
+export interface CrossSectorLinkage {
+  sector: CrossSectorType;
+  sectorLabel: string;
+  systemName: string;
+  description: string;
+  dataShared: string[];
+  legalBasis: string | null;
+  safeguards: string[];
+  vendors: EduSystemVendor[];
+  url: string | null;
+  citationNumbers: number[];
+}
+
+export type SafeguardCategory = "federal-law" | "state-law" | "policy" | "technical" | "gap";
+
+export interface DataSafeguard {
+  category: SafeguardCategory;
+  name: string;
+  description: string;
+  url: string | null;
+  scope: "federal" | "state" | "county-district";
+  citationNumbers: number[];
+}
+
+export interface CountyReport {
+  countyName: string;
+  stateName: string;
+  stateAbbr: string;
+  fipsCode: string;
+  analysisDate: string;
+  dataAvailabilityNote: string;
+  educationSystems: EduDataSystem[];
+  crossSectorLinkages: CrossSectorLinkage[];
+  safeguards: DataSafeguard[];
+  keyFindings: string[];
+  questionsToAsk: string[];
+  citations: Citation[];
+  rawNotes?: string;
+}
+
 export interface StreamEvent {
   type: "progress" | "result" | "error";
   message?: string;
