@@ -216,7 +216,7 @@ export async function runCountyAgent(
   onProgress: (msg: string) => void
 ): Promise<CountyReport> {
   const model = client.getGenerativeModel({
-    model: "gemini-2.5-flash-preview-04-17",
+    model: "gemini-2.5-flash",
     systemInstruction: SYSTEM_PROMPT,
     tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
     toolConfig: { functionCallingConfig: { mode: FunctionCallingMode.AUTO } },
