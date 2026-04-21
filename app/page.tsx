@@ -6,6 +6,7 @@ import type { VendorReport, CountyReport } from "@/lib/types";
 import type { CountyInfo } from "@/components/USCountyMap";
 import { AnalysisReport } from "@/components/AnalysisReport";
 import { CountyReport as CountyReportView } from "@/components/CountyReport";
+import { ReportActions } from "@/components/ReportActions";
 
 // react-simple-maps uses browser SVG APIs — load client-side only
 const USCountyMap = dynamic(
@@ -92,13 +93,13 @@ function VendorAnalyzer() {
 
   return (
     <div className="space-y-8">
-      <p className="text-slate-400 max-w-2xl leading-relaxed">
+      <p className="text-slate-400 max-w-2xl leading-relaxed no-print">
         Enter an edtech vendor or app name. The AI agent investigates their privacy policy,
         subprocessor chain, detected trackers, and company ownership — so you can ask the right
         questions before signing a contract.
       </p>
 
-      <form onSubmit={(e) => { e.preventDefault(); analyze(vendorName); }} className="space-y-3">
+      <form onSubmit={(e) => { e.preventDefault(); analyze(vendorName); }} className="space-y-3 no-print">
         <div className="flex gap-3">
           <input
             type="text"
@@ -132,7 +133,7 @@ function VendorAnalyzer() {
       </form>
 
       {loading && (
-        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5 space-y-3">
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5 space-y-3 no-print">
           <div className="flex items-center gap-3">
             <div className="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
             <span className="text-slate-300 text-sm font-medium">Agent is investigating…</span>
@@ -149,7 +150,7 @@ function VendorAnalyzer() {
       )}
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-sm space-y-3">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-sm space-y-3 no-print">
           <p className="text-red-300"><strong>Error:</strong> {error}</p>
           <button onClick={() => analyze(vendorName)}
             className="px-4 py-2 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm hover:bg-red-500/30 transition-colors">
@@ -159,7 +160,8 @@ function VendorAnalyzer() {
       )}
 
       {report && (
-        <div className="border-t border-slate-700 pt-10">
+        <div className="border-t border-slate-700 pt-10 space-y-6">
+          <ReportActions type="vendor" report={report} />
           <AnalysisReport report={report} />
         </div>
       )}
@@ -242,7 +244,7 @@ function CountyExplorer() {
 
   return (
     <div className="space-y-6">
-      <p className="text-slate-400 max-w-2xl leading-relaxed">
+      <p className="text-slate-400 max-w-2xl leading-relaxed no-print">
         Click any county on the map to investigate its public education data integration ecosystem —
         from preschool through K-12 — including state longitudinal data systems, early childhood
         integrated data systems, kindergarten entry assessments, cross-sector data linkages, and
@@ -256,14 +258,14 @@ function CountyExplorer() {
       />
 
       {selectedCounty && !report && (
-        <div className="text-center text-xs text-slate-500">
+        <div className="text-center text-xs text-slate-500 no-print">
           Selected: <span className="text-slate-300 font-medium">{selectedCounty.name} County, {selectedCounty.stateName}</span>
           {loading && " · Investigating…"}
         </div>
       )}
 
       {loading && (
-        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5 space-y-3">
+        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5 space-y-3 no-print">
           <div className="flex items-center gap-3">
             <div className="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
             <span className="text-slate-300 text-sm font-medium">
@@ -282,7 +284,7 @@ function CountyExplorer() {
       )}
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-sm space-y-3">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-sm space-y-3 no-print">
           <p className="text-red-300"><strong>Error:</strong> {error}</p>
           {selectedCounty && (
             <button onClick={() => investigateCounty(selectedCounty)}
@@ -294,7 +296,8 @@ function CountyExplorer() {
       )}
 
       {report && (
-        <div className="border-t border-slate-700 pt-10">
+        <div className="border-t border-slate-700 pt-10 space-y-6">
+          <ReportActions type="county" report={report} />
           <CountyReportView report={report} />
         </div>
       )}
@@ -320,7 +323,7 @@ export default function Home() {
       <div className="max-w-5xl mx-auto space-y-8">
 
         {/* Hero */}
-        <div className="text-center space-y-3">
+        <div className="text-center space-y-3 no-print">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs font-medium mb-2">
             AI-powered · For schools, districts, and advocates
           </div>
@@ -334,7 +337,7 @@ export default function Home() {
         </div>
 
         {/* Mode tabs */}
-        <div className="flex gap-1 p-1 rounded-xl bg-slate-800 border border-slate-700 max-w-xl mx-auto">
+        <div className="flex gap-1 p-1 rounded-xl bg-slate-800 border border-slate-700 max-w-xl mx-auto no-print">
           <button
             onClick={() => setMode("vendor")}
             className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${
@@ -358,7 +361,7 @@ export default function Home() {
         </div>
 
         {/* Mode descriptions */}
-        <div className="space-y-1 text-center -mt-4">
+        <div className="space-y-1 text-center -mt-4 no-print">
           {mode === "vendor" && (
             <p className="text-xs text-slate-600">
               Analyze a specific edtech app's data flows, subprocessors, and ownership

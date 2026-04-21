@@ -7,3 +7,84 @@ body {
   color: #e2e8f0;
   font-family: ui-sans-serif, system-ui, sans-serif;
 }
+
+/* ── Print / PDF styles ─────────────────────────────────────────────────────── */
+
+.print-only { display: none; }
+
+@media print {
+  /* Hide all interactive chrome */
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+
+  /* Page setup */
+  @page {
+    margin: 1.5cm 1.8cm;
+    size: A4;
+  }
+
+  /* Render on white */
+  html, body {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+    font-size: 11pt;
+  }
+
+  /* Remove shadows and translucent backgrounds */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Convert dark backgrounds → white or very light */
+  [class*="bg-slate-9"],
+  [class*="bg-slate-8"],
+  [class*="bg-slate-7"] {
+    background-color: #f8fafc !important;
+  }
+
+  /* Border colors → light gray */
+  [class*="border-slate-7"],
+  [class*="border-slate-6"] {
+    border-color: #cbd5e1 !important;
+  }
+
+  /* Text colors — keep semantic colors but darken for readability */
+  [class*="text-slate-2"],
+  [class*="text-slate-3"],
+  [class*="text-slate-4"],
+  [class*="text-white"] {
+    color: #1e293b !important;
+  }
+  [class*="text-slate-5"],
+  [class*="text-slate-6"] {
+    color: #475569 !important;
+  }
+
+  /* Keep semantic accent colors (blue, red, green, amber) for badges */
+  [class*="text-blue-"] { color: #1d4ed8 !important; }
+  [class*="text-red-"]  { color: #b91c1c !important; }
+  [class*="text-emerald-"] { color: #065f46 !important; }
+  [class*="text-amber-"]   { color: #92400e !important; }
+  [class*="text-purple-"]  { color: #6b21a8 !important; }
+
+  /* Avoid page breaks inside cards */
+  section, .rounded-xl, .rounded-2xl {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Section headings: new page if near bottom */
+  h2 { break-after: avoid; page-break-after: avoid; }
+
+  /* Links: show URL after text */
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 8pt;
+    color: #64748b;
+    word-break: break-all;
+  }
+
+  /* But NOT for badge/icon links */
+  a.group::after, a[class*="rounded"]::after { content: none; }
+}
