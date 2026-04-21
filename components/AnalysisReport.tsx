@@ -1,224 +1,105 @@
 "use client";
 
-import type { VendorReport, DataFlowNode, NodeLayer, Citation } from "@/lib/types";
-import { MetricCards } from "./MetricCards";
-import { MermaidDiagram } from "./MermaidDiagram";
+import type { VendorReport, Citation } from "@/lib/types";
+import { DataFlowDiagram } from "./DataFlowDiagram";
 import { DiscrepancyList } from "./DiscrepancyList";
 import { SubprocessorTable } from "./SubprocessorTable";
 import { CompanyHistory } from "./CompanyHistory";
-import { RedditPosts } from "./RedditPosts";
 
 interface Props {
   report: VendorReport;
 }
 
-function Section({ id, title, children }: { id?: string; title: string; children: React.ReactNode }) {
+function Section({ id, title, children, subtitle }: {
+  id?: string;
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section id={id} className="space-y-3 scroll-mt-6">
-      <h2 className="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">
-        {title}
-      </h2>
+    <section id={id} className="space-y-4 scroll-mt-6">
+      <div className="border-b border-slate-700 pb-2 space-y-0.5">
+        <h2 className="text-lg font-semibold text-slate-200">{title}</h2>
+        {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
+      </div>
       {children}
     </section>
   );
 }
 
-// ── Citation badge [N] with tooltip ──────────────────────────────────────────
+// ── Inline citation badge with tooltip ───────────────────────────────────────
 function CiteBadge({ citation }: { citation: Citation }) {
   return (
     <a
       href={`#citation-${citation.number}`}
       className="group relative inline-flex items-center mx-0.5 align-super"
-      title={`${citation.label}: ${citation.context}`}
     >
       <span className="text-[10px] font-mono font-bold text-blue-400 bg-blue-500/15 border border-blue-500/30 px-1 py-0.5 rounded hover:bg-blue-500/30 transition-colors leading-none">
         [{citation.number}]
       </span>
-      {/* hover tooltip */}
-      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col w-64 bg-slate-800 border border-slate-600 rounded-xl p-3 text-xs text-slate-300 z-50 shadow-2xl gap-1">
-        <span className="font-semibold text-blue-300 truncate">{citation.label}</span>
-        <span className="text-slate-400 leading-relaxed">{citation.context}</span>
-        <span className="text-slate-500 truncate mt-1">↗ {citation.url}</span>
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col w-72 bg-slate-800 border border-slate-600 rounded-xl p-3 text-xs z-50 shadow-2xl gap-1.5">
+        <span className="font-semibold text-blue-300">{citation.label}</span>
+        <span className="text-slate-300 leading-relaxed">{citation.context}</span>
+        <span className="text-slate-500 truncate font-mono text-[10px]">{citation.url}</span>
       </span>
     </a>
   );
 }
 
-// Build a URL→citation lookup for annotating nodes by URL match
-function useCiteByUrl(citations: Citation[]): (url: string | null | undefined) => Citation | undefined {
+function useCiteByUrl(citations: Citation[]) {
   const map = new Map<string, Citation>();
   for (const c of citations ?? []) {
+    map.set(c.url, c);
     try {
-      const hostname = new URL(c.url).hostname.replace(/^www\./, "");
-      map.set(hostname, c);
-      map.set(c.url, c);
-    } catch { /* ignore */ }
+      map.set(new URL(c.url).hostname.replace(/^www\./, ""), c);
+    } catch { /* skip */ }
   }
-  return (url) => {
+  return (url?: string | null): Citation | undefined => {
     if (!url) return undefined;
     if (map.has(url)) return map.get(url);
-    try {
-      const hostname = new URL(url).hostname.replace(/^www\./, "");
-      return map.get(hostname);
-    } catch { return undefined; }
+    try { return map.get(new URL(url).hostname.replace(/^www\./, "")); } catch { return undefined; }
   };
 }
 
-// ── Layer config ──────────────────────────────────────────────────────────────
-const LAYER_CONFIG: Record<NodeLayer, { label: string; icon: string; colorClass: string }> = {
-  "upstream-infra":        { label: "Cloud Infrastructure",        icon: "☁️", colorClass: "border-purple-500/40 bg-purple-500/10 text-purple-300" },
-  "upstream-analytics":    { label: "Analytics & Tracking",        icon: "📊", colorClass: "border-red-500/40 bg-red-500/10 text-red-300" },
-  "upstream-ads":          { label: "Advertising",                 icon: "📣", colorClass: "border-orange-500/40 bg-orange-500/10 text-orange-300" },
-  "upstream-auth":         { label: "Auth & Identity",             icon: "🔑", colorClass: "border-yellow-500/40 bg-yellow-500/10 text-yellow-300" },
-  "app":                   { label: "Application",                 icon: "🏫", colorClass: "border-blue-500/40 bg-blue-500/20 text-blue-200" },
-  "integration-rostering": { label: "Rostering & SSO",            icon: "🔗", colorClass: "border-cyan-500/40 bg-cyan-500/10 text-cyan-300" },
-  "integration-lms":       { label: "Learning Management",         icon: "📚", colorClass: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" },
-  "downstream-sis":        { label: "Student Information Systems", icon: "🗄️", colorClass: "border-amber-500/40 bg-amber-500/10 text-amber-300" },
-  "downstream-state":      { label: "State & Federal Data",        icon: "🏛️", colorClass: "border-pink-500/40 bg-pink-500/10 text-pink-300" },
-};
-
-const UPSTREAM_LAYERS: NodeLayer[] = ["upstream-infra", "upstream-analytics", "upstream-ads", "upstream-auth"];
-const DOWNSTREAM_LAYERS: NodeLayer[] = ["integration-rostering", "integration-lms", "downstream-sis", "downstream-state"];
-
-const SOURCE_BADGE: Record<DataFlowNode["source"], string> = {
-  declared: "bg-slate-700 text-slate-400",
-  detected: "bg-red-500/20 text-red-300",
-  inferred: "bg-yellow-500/20 text-yellow-300",
-};
-
-function NodeCard({ node, cite }: { node: DataFlowNode; cite?: Citation }) {
-  const cfg = LAYER_CONFIG[node.layer];
-  const inner = (
-    <div className={`rounded-lg border px-3 py-2 text-sm space-y-1 ${cfg.colorClass}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-1 flex-wrap">
-          <span className="font-medium">{node.name}</span>
-          {cite && <CiteBadge citation={cite} />}
-        </div>
-        <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded ${SOURCE_BADGE[node.source]}`}>
-          {node.source}
-        </span>
-      </div>
-      <p className="text-xs opacity-70">{node.description}</p>
-      {node.dataTypes.length > 0 && (
-        <p className="text-xs opacity-60 italic">{node.dataTypes.slice(0, 3).join(" · ")}</p>
-      )}
-    </div>
-  );
-
-  if (node.url) {
-    return (
-      <a href={node.url} target="_blank" rel="noopener noreferrer" className="block hover:opacity-80 transition-opacity">
-        {inner}
+// ── Source document pill ──────────────────────────────────────────────────────
+function DocPill({ href, label, cite }: { href: string; label: string; cite?: Citation }) {
+  return (
+    <div className="flex items-center gap-1">
+      <a href={href} target="_blank" rel="noopener noreferrer"
+        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-blue-400 hover:border-blue-500 hover:bg-slate-800/80 transition-colors">
+        {label} <span className="text-slate-500">↗</span>
       </a>
-    );
-  }
-  return inner;
-}
-
-function LayerGroup({ layer, nodes, getCite }: {
-  layer: NodeLayer;
-  nodes: DataFlowNode[];
-  getCite: (url?: string | null) => Citation | undefined;
-}) {
-  if (!nodes.length) return null;
-  const cfg = LAYER_CONFIG[layer];
-  return (
-    <div className="space-y-2">
-      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-        {cfg.icon} {cfg.label}
-      </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-        {nodes.map((n) => <NodeCard key={n.id} node={n} cite={getCite(n.url)} />)}
-      </div>
+      {cite && <CiteBadge citation={cite} />}
     </div>
   );
 }
 
-function DataFlowPanel({ nodes, citations }: { nodes: DataFlowNode[]; citations: Citation[] }) {
-  const getCite = useCiteByUrl(citations);
-  const byLayer = new Map<NodeLayer, DataFlowNode[]>();
-  for (const n of nodes) {
-    if (!byLayer.has(n.layer)) byLayer.set(n.layer, []);
-    byLayer.get(n.layer)!.push(n);
-  }
-
-  const appNodes = byLayer.get("app") ?? [];
-  const upstreamNodes = UPSTREAM_LAYERS.flatMap((l) => byLayer.get(l) ?? []);
-  const downstreamNodes = DOWNSTREAM_LAYERS.flatMap((l) => byLayer.get(l) ?? []);
-
-  return (
-    <div className="space-y-6">
-      {upstreamNodes.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="h-px flex-1 bg-slate-700" />
-            <span className="text-xs text-slate-500 font-medium uppercase tracking-wider px-2">⬆ Upstream Dependencies</span>
-            <div className="h-px flex-1 bg-slate-700" />
-          </div>
-          {UPSTREAM_LAYERS.map((l) => (
-            <LayerGroup key={l} layer={l} nodes={byLayer.get(l) ?? []} getCite={getCite} />
-          ))}
-        </div>
-      )}
-
-      {appNodes.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <div className="h-px flex-1 bg-blue-700/40" />
-            <span className="text-xs text-blue-400 font-bold uppercase tracking-wider px-2">▼ Application</span>
-            <div className="h-px flex-1 bg-blue-700/40" />
-          </div>
-          <div className="grid grid-cols-1 gap-2">
-            {appNodes.map((n) => <NodeCard key={n.id} node={n} cite={getCite(n.url)} />)}
-          </div>
-        </div>
-      )}
-
-      {downstreamNodes.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="h-px flex-1 bg-slate-700" />
-            <span className="text-xs text-slate-500 font-medium uppercase tracking-wider px-2">⬇ Downstream Education Systems</span>
-            <div className="h-px flex-1 bg-slate-700" />
-          </div>
-          {DOWNSTREAM_LAYERS.map((l) => (
-            <LayerGroup key={l} layer={l} nodes={byLayer.get(l) ?? []} getCite={getCite} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Annotated citations list with anchor IDs ──────────────────────────────────
+// ── Citations list with anchor IDs ────────────────────────────────────────────
 function CitationsList({ citations }: { citations: Citation[] }) {
   if (!citations?.length) return null;
   return (
-    <ol className="space-y-3">
+    <ol className="space-y-4">
       {citations.map((c) => (
-        <li key={c.number} id={`citation-${c.number}`} className="flex gap-3 text-sm scroll-mt-6 group">
-          {/* anchor badge */}
+        <li key={c.number} id={`citation-${c.number}`} className="flex gap-4 scroll-mt-6 group">
           <a
             href={c.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="shrink-0 w-7 h-7 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-400 text-xs font-mono font-bold flex items-center justify-center hover:bg-blue-500/30 transition-colors mt-0.5"
-            title="Open source"
+            className="shrink-0 w-8 h-8 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-400 text-xs font-mono font-bold flex items-center justify-center hover:bg-blue-500/30 transition-colors mt-0.5"
           >
             {c.number}
           </a>
-          <div className="flex-1 space-y-1">
+          <div className="flex-1 space-y-1.5">
             <a
               href={c.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-blue-300 hover:text-blue-200 hover:underline leading-tight"
+              className="font-semibold text-blue-300 hover:text-blue-200 hover:underline text-sm leading-tight"
             >
               {c.label} ↗
             </a>
-            <p className="text-xs text-slate-400 leading-relaxed">{c.context}</p>
-            <p className="text-xs text-slate-600 font-mono truncate">{c.url}</p>
+            <p className="text-sm text-slate-300 leading-relaxed">{c.context}</p>
+            <p className="text-[11px] text-slate-600 font-mono truncate">{c.url}</p>
           </div>
         </li>
       ))}
@@ -226,22 +107,17 @@ function CitationsList({ citations }: { citations: Citation[] }) {
   );
 }
 
-// ── Source document pill with optional citation badge ─────────────────────────
-function DocLink({ href, label, cite }: { href: string; label: string; cite?: Citation }) {
-  return (
-    <div className="flex items-center gap-1">
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-blue-400 hover:border-blue-500 transition-colors"
-      >
-        {label} ↗
-      </a>
-      {cite && <CiteBadge citation={cite} />}
-    </div>
-  );
-}
+// ── Risk badge ────────────────────────────────────────────────────────────────
+const RISK_STYLES = {
+  elevated:      "bg-red-500/20 text-red-300 border-red-500/40",
+  standard:      "bg-yellow-500/20 text-yellow-300 border-yellow-500/40",
+  "low-concern": "bg-green-500/20 text-green-300 border-green-500/40",
+};
+const RISK_LABELS = {
+  elevated:      "⚠ Elevated Concern",
+  standard:      "● Standard Risk",
+  "low-concern": "✓ Low Concern",
+};
 
 export function AnalysisReport({ report }: Props) {
   const docs = report.privacyDocuments;
@@ -249,44 +125,42 @@ export function AnalysisReport({ report }: Props) {
   const getCite = useCiteByUrl(citations);
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">{report.vendorName}</h1>
-        {report.appName !== report.vendorName && (
-          <p className="text-slate-400 text-sm mt-1">App: {report.appName}</p>
-        )}
+    <div className="space-y-10">
+
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold text-white">{report.vendorName}</h1>
+          {report.appName !== report.vendorName && (
+            <p className="text-slate-400 text-sm mt-1">App: {report.appName}</p>
+          )}
+          <p className="text-xs text-slate-600 mt-1">
+            Analysis date: {new Date(report.analysisDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+          </p>
+        </div>
+        <span className={`px-4 py-2 rounded-full text-sm font-semibold border ${RISK_STYLES[report.riskLevel]}`}>
+          {RISK_LABELS[report.riskLevel]}
+        </span>
       </div>
 
-      {/* Company ownership */}
+      {/* ── Company Ownership ──────────────────────────────────────────── */}
       {report.companyOwnership && (
-        <Section title="Company Ownership & Acquisition History">
+        <Section title="Company Ownership & Acquisition History"
+          subtitle="Who ultimately controls this product and its data.">
           <CompanyHistory ownership={report.companyOwnership} />
         </Section>
       )}
 
-      {/* Metric cards */}
-      <MetricCards report={report} />
-
-      {/* Source documents */}
-      {(docs.privacyPolicyUrl || docs.dpaUrl || docs.subprocessorListUrl) && (
-        <Section title="Source Documents">
-          <div className="flex flex-wrap gap-3 items-start">
-            {docs.privacyPolicyUrl && (
-              <DocLink href={docs.privacyPolicyUrl} label="Privacy Policy" cite={getCite(docs.privacyPolicyUrl)} />
-            )}
-            {docs.dpaUrl && (
-              <DocLink href={docs.dpaUrl} label="Data Processing Agreement" cite={getCite(docs.dpaUrl)} />
-            )}
-            {docs.subprocessorListUrl && (
-              <DocLink href={docs.subprocessorListUrl} label="Subprocessor List" cite={getCite(docs.subprocessorListUrl)} />
-            )}
-            {docs.appStoreUrl && (
-              <DocLink href={docs.appStoreUrl} label="App Store" cite={getCite(docs.appStoreUrl)} />
-            )}
-            {docs.playStoreUrl && (
-              <DocLink href={docs.playStoreUrl} label="Play Store" cite={getCite(docs.playStoreUrl)} />
-            )}
+      {/* ── Source Documents ───────────────────────────────────────────── */}
+      {(docs.privacyPolicyUrl || docs.dpaUrl || docs.subprocessorListUrl || docs.appStoreUrl || docs.playStoreUrl) && (
+        <Section title="Primary Source Documents"
+          subtitle="Official documents reviewed for this analysis. Click to read the originals.">
+          <div className="flex flex-wrap gap-3">
+            {docs.privacyPolicyUrl   && <DocPill href={docs.privacyPolicyUrl}   label="Privacy Policy"               cite={getCite(docs.privacyPolicyUrl)} />}
+            {docs.dpaUrl             && <DocPill href={docs.dpaUrl}             label="Data Processing Agreement"    cite={getCite(docs.dpaUrl)} />}
+            {docs.subprocessorListUrl && <DocPill href={docs.subprocessorListUrl} label="Subprocessor List"          cite={getCite(docs.subprocessorListUrl)} />}
+            {docs.appStoreUrl        && <DocPill href={docs.appStoreUrl}        label="App Store"                    cite={getCite(docs.appStoreUrl)} />}
+            {docs.playStoreUrl       && <DocPill href={docs.playStoreUrl}       label="Play Store"                   cite={getCite(docs.playStoreUrl)} />}
           </div>
           {docs.lastUpdated && (
             <p className="text-xs text-slate-500 mt-2">Privacy policy last updated: {docs.lastUpdated}</p>
@@ -294,52 +168,44 @@ export function AnalysisReport({ report }: Props) {
         </Section>
       )}
 
-      {/* Data Flow Diagram */}
-      {report.diagramCode && (
-        <Section title="Data Flow Diagram">
-          <p className="text-xs text-slate-500 mb-3">
-            Full chain: upstream cloud services → app → integration layer → downstream education systems.
-            <span className="ml-1 text-slate-600">Hover to preview · Click to open zoomable full-screen view.</span>
-          </p>
-          <MermaidDiagram code={report.diagramCode} />
-        </Section>
-      )}
-
-      {/* Layered data flow panel */}
+      {/* ── Data Flow ──────────────────────────────────────────────────── */}
       {report.dataFlowNodes?.length > 0 && (
-        <Section title="Full Data Flow — Node Details">
-          <p className="text-xs text-slate-500 mb-1">
-            Each node links to its privacy page. Badge <span className="font-mono text-blue-400 bg-blue-500/10 px-1 rounded">[N]</span> links to the citation that verified it — hover for a preview.
-          </p>
-          <DataFlowPanel nodes={report.dataFlowNodes} citations={citations} />
+        <Section
+          title="Data Flow — Full Chain"
+          subtitle="Where student data goes: upstream services the app relies on, the app itself, and downstream education systems it connects to. Each node links to the company's privacy page. Hover [N] to see the source."
+        >
+          <DataFlowDiagram nodes={report.dataFlowNodes} citations={citations} />
         </Section>
       )}
 
-      {/* Discrepancies */}
-      <Section title="Discrepancies Flagged">
+      {/* ── Discrepancies ──────────────────────────────────────────────── */}
+      <Section title="Discrepancies Between Declared & Detected Practices"
+        subtitle="Gaps found between what the vendor claims and what was actually detected.">
         <DiscrepancyList report={report} />
       </Section>
 
-      {/* Subprocessors */}
+      {/* ── Subprocessors table ────────────────────────────────────────── */}
       {report.subprocessors?.length > 0 && (
-        <Section title={`Subprocessors (${report.subprocessors.length} declared or detected)`}>
+        <Section title="Subprocessors"
+          subtitle="Third parties with access to student data, as declared or detected. Names link to their privacy pages.">
           <SubprocessorTable report={report} citations={citations} />
         </Section>
       )}
 
-      {/* Trackers */}
+      {/* ── Trackers ───────────────────────────────────────────────────── */}
       {report.trackers?.length > 0 && (
-        <Section title={`Trackers Detected via Exodus Privacy (${report.trackers.length})`}>
+        <Section title="Trackers Detected via Exodus Privacy"
+          subtitle="SDKs found in the Android app that were not declared in privacy documentation.">
           <div className="flex flex-wrap gap-2">
             {report.trackers.map((t, i) => (
-              <div key={i} className="flex items-center gap-1 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-sm">
+              <div key={i} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
                 {t.website ? (
                   <a href={t.website} target="_blank" rel="noopener noreferrer"
-                    className="font-medium text-red-300 hover:underline">{t.name}</a>
+                    className="font-medium text-red-300 hover:underline text-sm">{t.name}</a>
                 ) : (
-                  <span className="font-medium text-red-300">{t.name}</span>
+                  <span className="font-medium text-red-300 text-sm">{t.name}</span>
                 )}
-                <span className="ml-1 text-xs text-slate-500">{t.category}</span>
+                <span className="text-xs text-slate-500">{t.category}</span>
                 {t.website && getCite(t.website) && <CiteBadge citation={getCite(t.website)!} />}
               </div>
             ))}
@@ -347,56 +213,45 @@ export function AnalysisReport({ report }: Props) {
         </Section>
       )}
 
-      {/* Vendor questions */}
-      <Section title="Questions to Send the Vendor">
-        <ol className="space-y-3">
+      {/* ── Vendor Questions ───────────────────────────────────────────── */}
+      <Section title="Questions to Ask the Vendor"
+        subtitle="Specific questions for procurement or legal review based on gaps found in this analysis.">
+        <ol className="space-y-4">
           {report.vendorQuestions.map((q, i) => (
             <li key={i} className="flex gap-3">
-              <span className="shrink-0 w-6 h-6 rounded-full bg-blue-500/20 text-blue-300 text-sm font-semibold flex items-center justify-center">
+              <span className="shrink-0 w-7 h-7 rounded-full bg-blue-500/20 text-blue-300 text-sm font-bold flex items-center justify-center mt-0.5">
                 {i + 1}
               </span>
-              <p className="text-slate-300 text-sm leading-relaxed">{q}</p>
+              <p className="text-slate-300 text-sm leading-relaxed pt-0.5">{q}</p>
             </li>
           ))}
         </ol>
       </Section>
 
-      {/* Human-in-the-loop steps */}
-      <Section title="Steps That Require Human Verification">
-        <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4">
-          <p className="text-amber-200 text-xs font-medium mb-3 uppercase tracking-wide">
-            This automated analysis cannot substitute for the following:
-          </p>
-          <ul className="space-y-2">
-            {report.humanInLoopSteps.map((step, i) => (
-              <li key={i} className="flex gap-2 text-sm text-slate-300">
-                <span className="text-amber-400 shrink-0">→</span>
-                {step}
-              </li>
-            ))}
-          </ul>
+      {/* ── Human-in-loop ──────────────────────────────────────────────── */}
+      <Section title="Steps Requiring Human Verification"
+        subtitle="Things this automated analysis cannot do — requiring a qualified human reviewer.">
+        <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 p-5 space-y-3">
+          {report.humanInLoopSteps.map((step, i) => (
+            <div key={i} className="flex gap-3 text-sm text-slate-300">
+              <span className="text-amber-400 font-bold shrink-0">→</span>
+              <p className="leading-relaxed">{step}</p>
+            </div>
+          ))}
         </div>
       </Section>
 
-      {/* Reddit discussion */}
-      <Section title="Reddit Community Discussion">
-        <p className="text-xs text-slate-500 mb-3">
-          Live posts from Reddit — pulled directly from Reddit's API, not AI-generated.
-          Prioritises early childhood education and edtech subreddits.
-        </p>
-        <RedditPosts vendorName={report.vendorName} />
-      </Section>
-
-      {/* Citations — anchored, numbered, full context */}
+      {/* ── Citations ──────────────────────────────────────────────────── */}
       {citations.length > 0 && (
-        <Section id="citations" title="Citations">
-          <p className="text-xs text-slate-500 mb-3">
-            Every badge <span className="font-mono text-blue-400 bg-blue-500/10 px-1 rounded">[N]</span> in this report links here.
-            Click any number badge or citation title to open the source.
-          </p>
+        <Section
+          id="citations"
+          title="Sources & Citations"
+          subtitle="Every claim in this report is backed by a source listed here. Click any [N] badge above to jump to its source."
+        >
           <CitationsList citations={citations} />
         </Section>
       )}
+
     </div>
   );
 }
