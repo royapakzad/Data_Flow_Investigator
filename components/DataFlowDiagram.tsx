@@ -86,12 +86,22 @@ function NodeCard({
         </div>
       )}
 
-      {/* Footer: source link + citation */}
+      {/* Footer: source evidence link + citation */}
       <div className="flex items-center justify-between gap-2 pt-1">
         {node.url ? (
-          <span className="text-[10px] text-blue-400 font-medium">Privacy Policy ↗</span>
+          <span className={`text-[10px] font-medium ${
+            node.source === "detected" ? "text-red-400" :
+            node.source === "inferred" ? "text-yellow-500" :
+            "text-blue-400"
+          }`}>
+            {node.source === "detected" ? "Detection source ↗" :
+             node.source === "inferred" ? "Integration page ↗" :
+             "Source document ↗"}
+          </span>
+        ) : node.source === "inferred" ? (
+          <span className="text-[10px] text-slate-600 italic">Inferred — no direct evidence</span>
         ) : (
-          <span />
+          <span className="text-[10px] text-amber-600">No source linked</span>
         )}
         {cite && <CiteBadge citation={cite} />}
       </div>
@@ -212,18 +222,29 @@ export function DataFlowDiagram({ nodes, citations }: Props) {
   return (
     <div className="space-y-1">
       {/* Legend */}
-      <div className="flex flex-wrap gap-3 pb-3 text-xs text-slate-500">
-        {[
-          { color: "bg-slate-700 border-slate-600", label: "Declared in privacy docs" },
-          { color: "bg-red-500/20 border-red-500/40", label: "Detected (not declared)" },
-          { color: "bg-yellow-500/15 border-yellow-500/30", label: "Inferred from integrations" },
-        ].map((item) => (
-          <div key={item.label} className="flex items-center gap-1.5">
-            <span className={`w-3 h-3 rounded-full border ${item.color}`} />
-            <span>{item.label}</span>
+      <div className="flex flex-wrap gap-4 pb-4 text-xs text-slate-500 border-b border-slate-800 mb-2">
+        <div className="flex items-start gap-1.5">
+          <span className="w-3 h-3 rounded-full border bg-slate-700 border-slate-600 mt-0.5 shrink-0" />
+          <div>
+            <span className="text-slate-300 font-medium">Declared</span>
+            <span className="ml-1">— vendor named this in their own privacy docs, DPA, or subprocessor list. Link goes to that document.</span>
           </div>
-        ))}
-        <div className="flex items-center gap-1.5 ml-2">
+        </div>
+        <div className="flex items-start gap-1.5">
+          <span className="w-3 h-3 rounded-full border bg-red-500/20 border-red-500/40 mt-0.5 shrink-0" />
+          <div>
+            <span className="text-red-300 font-medium">Detected</span>
+            <span className="ml-1">— found via technical scan (Exodus SDK analysis, BuiltWith, App Store privacy label) without being declared. Link goes to the detection source.</span>
+          </div>
+        </div>
+        <div className="flex items-start gap-1.5">
+          <span className="w-3 h-3 rounded-full border bg-yellow-500/15 border-yellow-500/30 mt-0.5 shrink-0" />
+          <div>
+            <span className="text-yellow-300 font-medium">Inferred</span>
+            <span className="ml-1">— assumed from known industry integration patterns, not confirmed by a specific document or scan. Treat as a lead to verify, not a fact.</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5">
           <span className="font-mono text-blue-400 bg-blue-500/10 px-1 rounded text-[10px]">[N]</span>
           <span>hover for source citation</span>
         </div>

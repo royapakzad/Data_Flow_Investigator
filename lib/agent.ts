@@ -220,7 +220,10 @@ After gathering data, output a JSON object matching this schema EXACTLY:
       "layer": "upstream-infra" | "upstream-analytics" | "upstream-ads" | "upstream-auth" | "app" | "integration-rostering" | "integration-lms" | "downstream-sis" | "downstream-state",
       "description": string,
       "dataTypes": string[],
-      "url": string | null,
+      "url": string | null,  // source evidence URL — meaning depends on source field:
+                             //   "declared": URL of the document where the vendor named this third party (privacy policy, DPA, subprocessor list, App Store page)
+                             //   "detected": URL of the detection source (Exodus Privacy result page, BuiltWith page, App Store privacy label page) — NOT the vendor's homepage
+                             //   "inferred": URL of a relevant integration page if available, otherwise null
       "country": string | null,
       "source": "declared" | "detected" | "inferred"
     }
@@ -253,7 +256,9 @@ ANTI-HALLUCINATION RULES — strictly enforced:
 - companyOwnership.acquisitionHistory: ONLY include events where you found and verified a real URL (news article, press release, SEC filing, Wikipedia with citation). If you cannot find a verifiable source URL, omit the event entirely. An empty array is correct when no verified acquisition is found.
 - companyOwnership.currentParentUrl: must be a real URL you fetched or found in search results, not constructed
 - Every citation URL must be a URL you actually retrieved or found in search results during this session
-- dataFlowNodes with source "inferred" are acceptable for downstream SIS/state nodes, but "declared" and "detected" require a citation
+- dataFlowNodes source "detected": ONLY use this when you have an actual detection tool result (Exodus, BuiltWith, App Store label). Set url to the detection source page URL. Never use "detected" for something you only found in a search result snippet.
+- dataFlowNodes source "declared": ONLY use this when you read the actual document and found the vendor named in it. Set url to that document URL.
+- dataFlowNodes source "inferred": acceptable for downstream SIS/state nodes based on known industry patterns. Set url to null or an integration page if found. Never mark inferred as declared or detected.
 - NEVER invent acquisition years, prices, or acquirer names — only report what you verified from a source URL
 
 For vendorQuestions: 5-8 specific, pointed questions for a procurement officer based on actual gaps found — especially around AI/ML tool use, undisclosed third parties, and what happens to student data when a subprocessor uses it to train models.
