@@ -25,6 +25,8 @@ export async function POST(req: Request) {
         try {
           const report = await runCountyAgent(countyName, stateName, stateAbbr ?? "", fipsCode ?? "", (msg) => {
             progress.push(msg);
+            // Write progress to Redis on each step so polling picks it up immediately
+            updateCountyJob(id, { progress: [...progress] }).catch(() => {});
           });
           await updateCountyJob(id, { status: "done", report, progress });
         } catch (err) {

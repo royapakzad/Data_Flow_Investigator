@@ -10,7 +10,7 @@ import { ReportActions } from "@/components/ReportActions";
 
 // ── Progress panel ────────────────────────────────────────────────────────────
 
-const ESTIMATED_STEPS = { vendor: 22, county: 28 };
+const ESTIMATED_STEPS = { vendor: 30, county: 28 };
 
 function ProgressPanel({
   log,
@@ -183,7 +183,7 @@ function VendorAnalyzer() {
             setLoading(false);
           }
         }
-      }, 2000);
+      }, 1000);
     } catch (err) {
       if (cancelledRef.current) return;
       const msg = err instanceof Error ? err.message : "Unknown error";
@@ -347,7 +347,7 @@ function CountyExplorer() {
             setLoading(false);
           }
         }
-      }, 2000);
+      }, 1000);
     } catch (err) {
       if (cancelledRef.current) return;
       const msg = err instanceof Error ? err.message : "Unknown error";

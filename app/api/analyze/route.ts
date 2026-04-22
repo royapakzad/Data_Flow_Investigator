@@ -24,7 +24,11 @@ export async function POST(req: Request) {
         await updateJob(id, { status: "running" });
         const progress: string[] = [];
         try {
-          const report = await runAgent(vendorName, (msg) => { progress.push(msg); });
+          const report = await runAgent(vendorName, (msg) => {
+            progress.push(msg);
+            // Write progress to Redis on each step so polling picks it up immediately
+            updateJob(id, { progress: [...progress] }).catch(() => {});
+          });
           await updateJob(id, { status: "done", report, progress });
         } catch (err) {
           await updateJob(id, {

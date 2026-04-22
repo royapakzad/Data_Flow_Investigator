@@ -74,7 +74,6 @@ export function SubprocessorTable({ report, citations = [] }: Props) {
                     ) : (
                       s.name
                     )}
-                    {/* inline citation badge if we matched one */}
                     {cite && (
                       <a
                         href={`#citation-${cite.number}`}
