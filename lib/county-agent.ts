@@ -205,6 +205,12 @@ For keyFindings: 4-6 specific, substantive findings about what data is collected
 For questionsToAsk: 5-8 specific questions for a school board member, parent advocate, or journalist based on actual gaps.
 For citations: 8-20 entries — all major findings must cite a source URL you actually visited.
 
+TOOL FAILURE HANDLING — critical:
+- If search_web returns "Search temporarily unavailable", immediately move to the next research step. Never stop researching because one search failed.
+- If fetch_page returns "Page could not be fetched", try a different URL or skip and continue.
+- Tool failures are common. Always output the complete JSON at the end regardless of how many tools failed.
+- After a tool failure, continue with the very next numbered step in the research plan.
+
 Output ONLY the JSON object. No markdown fences, no explanation.`;
 
 async function executeTool(name: string, input: Record<string, unknown>): Promise<string> {
@@ -230,7 +236,14 @@ async function executeTool(name: string, input: Record<string, unknown>): Promis
 
     return `Unknown tool: ${name}`;
   } catch (err) {
-    return `Tool error: ${err instanceof Error ? err.message : String(err)}`;
+    const msg = err instanceof Error ? err.message : String(err);
+    if (name === "search_web") {
+      return `Search temporarily unavailable (${msg}). Skip this search and continue with the next research step.`;
+    }
+    if (name === "fetch_page") {
+      return `Page could not be fetched (${msg}). Skip this URL and continue with other research steps.`;
+    }
+    return `Tool unavailable (${msg}). Continue with remaining research steps.`;
   }
 }
 

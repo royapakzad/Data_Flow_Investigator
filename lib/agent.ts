@@ -260,6 +260,12 @@ For vendorQuestions: 5-8 specific, pointed questions for a procurement officer b
 For humanInLoopSteps: 3-5 steps requiring human verification (dynamic traffic capture, DPA legal review, contractual audit rights, etc.).
 For citations: 10-20 entries — every major finding (subprocessor, integration, acquisition, tracker, AI tool, disclosure document) must cite a source URL you actually visited.
 
+TOOL FAILURE HANDLING — critical:
+- If search_web returns "Search temporarily unavailable", immediately move to the next research step. Never stop researching because one search failed.
+- If fetch_page returns "Page could not be fetched", try a different URL for the same information, or skip and continue.
+- Tool failures are common. A complete report with some gaps is far better than stopping early. Always output the JSON at the end regardless of how many tools failed.
+- After a tool failure, continue with the very next numbered step in the research plan.
+
 Output ONLY the JSON object. No markdown fences, no explanation.`;
 
 async function executeTool(
@@ -298,7 +304,15 @@ async function executeTool(
 
     return `Unknown tool: ${name}`;
   } catch (err) {
-    return `Tool error: ${err instanceof Error ? err.message : String(err)}`;
+    const msg = err instanceof Error ? err.message : String(err);
+    // Return a graceful message so the agent continues research rather than stopping
+    if (name === "search_web") {
+      return `Search temporarily unavailable (${msg}). Skip this search and continue with the next research step using other tools.`;
+    }
+    if (name === "fetch_page") {
+      return `Page could not be fetched (${msg}). Skip this URL and continue with other research steps.`;
+    }
+    return `Tool unavailable (${msg}). Continue with remaining research steps.`;
   }
 }
 
