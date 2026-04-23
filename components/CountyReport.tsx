@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type {
   CountyReport,
   EduDataSystem,
@@ -8,6 +9,110 @@ import type {
   EduSystemVendor,
   Citation,
 } from "@/lib/types";
+
+// ── Editable questions list ───────────────────────────────────────────────────
+
+function EditableQuestions({ initialQuestions }: { initialQuestions: string[] }) {
+  const [questions, setQuestions] = useState(initialQuestions);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
+  const [addingNew, setAddingNew] = useState(false);
+  const [newText, setNewText] = useState("");
+
+  function startEdit(i: number) {
+    setEditingIdx(i);
+    setEditText(questions[i]);
+  }
+
+  function saveEdit(i: number) {
+    const trimmed = editText.trim();
+    if (!trimmed) return;
+    const next = [...questions];
+    next[i] = trimmed;
+    setQuestions(next);
+    setEditingIdx(null);
+  }
+
+  function deleteQuestion(i: number) {
+    setQuestions(questions.filter((_, idx) => idx !== i));
+    if (editingIdx === i) setEditingIdx(null);
+  }
+
+  function addQuestion() {
+    const trimmed = newText.trim();
+    if (!trimmed) return;
+    setQuestions([...questions, trimmed]);
+    setNewText("");
+    setAddingNew(false);
+  }
+
+  return (
+    <div className="space-y-4">
+      <ol className="space-y-4">
+        {questions.map((q, i) => (
+          <li key={i} className="flex gap-3 group">
+            <span className="shrink-0 w-7 h-7 rounded-full bg-blue-500/20 text-blue-300 text-sm font-bold flex items-center justify-center mt-0.5">
+              {i + 1}
+            </span>
+            {editingIdx === i ? (
+              <div className="flex-1 space-y-2">
+                <textarea
+                  className="w-full bg-slate-800 border border-blue-500/50 rounded-lg p-2 text-slate-300 text-sm resize-none focus:outline-none focus:border-blue-400"
+                  rows={3}
+                  value={editText}
+                  onChange={e => setEditText(e.target.value)}
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <button onClick={() => saveEdit(i)} className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors">Save</button>
+                  <button onClick={() => setEditingIdx(null)} className="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex items-start justify-between gap-2">
+                <p className="text-slate-300 text-sm leading-relaxed pt-0.5 flex-1">{q}</p>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 pt-0.5">
+                  <button onClick={() => startEdit(i)} title="Edit" className="p-1 text-slate-500 hover:text-blue-400 transition-colors text-base leading-none">✎</button>
+                  <button onClick={() => deleteQuestion(i)} title="Delete" className="p-1 text-slate-500 hover:text-red-400 transition-colors text-base leading-none">✕</button>
+                </div>
+              </div>
+            )}
+          </li>
+        ))}
+      </ol>
+
+      {addingNew ? (
+        <div className="flex gap-3">
+          <span className="shrink-0 w-7 h-7 rounded-full bg-blue-500/20 text-blue-300 text-sm font-bold flex items-center justify-center mt-0.5">
+            {questions.length + 1}
+          </span>
+          <div className="flex-1 space-y-2">
+            <textarea
+              className="w-full bg-slate-800 border border-blue-500/50 rounded-lg p-2 text-slate-300 text-sm resize-none focus:outline-none focus:border-blue-400"
+              rows={3}
+              value={newText}
+              onChange={e => setNewText(e.target.value)}
+              placeholder="Type your question…"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button onClick={addQuestion} className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors">Add</button>
+              <button onClick={() => { setAddingNew(false); setNewText(""); }} className="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors">Cancel</button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setAddingNew(true)}
+          className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-400 transition-colors"
+        >
+          <span className="w-7 h-7 rounded-full border border-dashed border-slate-600 hover:border-blue-500 flex items-center justify-center text-lg leading-none">+</span>
+          Add a question
+        </button>
+      )}
+    </div>
+  );
+}
 
 // ── Section wrapper ───────────────────────────────────────────────────────────
 
@@ -508,16 +613,7 @@ export function CountyReport({ report }: Props) {
         <Section
           title="Questions to Ask Your School Board or State DOE"
           subtitle="Specific questions for parents, advocates, or journalists based on gaps found in this analysis.">
-          <ol className="space-y-4">
-            {report.questionsToAsk.map((q, i) => (
-              <li key={i} className="flex gap-3">
-                <span className="shrink-0 w-7 h-7 rounded-full bg-blue-500/20 text-blue-300 text-sm font-bold flex items-center justify-center mt-0.5">
-                  {i + 1}
-                </span>
-                <p className="text-slate-300 text-sm leading-relaxed pt-0.5">{q}</p>
-              </li>
-            ))}
-          </ol>
+          <EditableQuestions initialQuestions={report.questionsToAsk} />
         </Section>
       )}
 
