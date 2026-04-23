@@ -268,6 +268,41 @@ function VendorAnalyzer() {
   );
 }
 
+// ── County text-search helpers ────────────────────────────────────────────────
+
+const STATE_BY_ABBR: Record<string, string> = {
+  AL:"Alabama",AK:"Alaska",AZ:"Arizona",AR:"Arkansas",CA:"California",CO:"Colorado",
+  CT:"Connecticut",DE:"Delaware",DC:"District of Columbia",FL:"Florida",GA:"Georgia",
+  HI:"Hawaii",ID:"Idaho",IL:"Illinois",IN:"Indiana",IA:"Iowa",KS:"Kansas",KY:"Kentucky",
+  LA:"Louisiana",ME:"Maine",MD:"Maryland",MA:"Massachusetts",MI:"Michigan",MN:"Minnesota",
+  MS:"Mississippi",MO:"Missouri",MT:"Montana",NE:"Nebraska",NV:"Nevada",NH:"New Hampshire",
+  NJ:"New Jersey",NM:"New Mexico",NY:"New York",NC:"North Carolina",ND:"North Dakota",
+  OH:"Ohio",OK:"Oklahoma",OR:"Oregon",PA:"Pennsylvania",RI:"Rhode Island",SC:"South Carolina",
+  SD:"South Dakota",TN:"Tennessee",TX:"Texas",UT:"Utah",VT:"Vermont",VA:"Virginia",
+  WA:"Washington",WV:"West Virginia",WI:"Wisconsin",WY:"Wyoming",
+};
+const STATE_BY_NAME: Record<string, string> = Object.fromEntries(
+  Object.entries(STATE_BY_ABBR).map(([abbr, name]) => [name.toLowerCase(), abbr])
+);
+
+function parseCountySearch(raw: string): CountyInfo | null {
+  const comma = raw.lastIndexOf(",");
+  if (comma === -1) return null;
+  const countyName = raw.slice(0, comma).trim().replace(/\s+county$/i, "").trim();
+  const statePart = raw.slice(comma + 1).trim();
+  if (!countyName || !statePart) return null;
+
+  const upper = statePart.toUpperCase();
+  if (STATE_BY_ABBR[upper]) {
+    return { name: countyName, stateName: STATE_BY_ABBR[upper], stateAbbr: upper, fips: "" };
+  }
+  const abbr = STATE_BY_NAME[statePart.toLowerCase()];
+  if (abbr) {
+    return { name: countyName, stateName: statePart, stateAbbr: abbr, fips: "" };
+  }
+  return null;
+}
+
 // ── County Education Data tab ─────────────────────────────────────────────────
 
 function CountyExplorer() {
@@ -279,11 +314,25 @@ function CountyExplorer() {
   const [attempt, setAttempt] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const cancelledRef = useRef(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   function cancel() {
     cancelledRef.current = true;
     if (pollRef.current) clearInterval(pollRef.current);
     setLoading(false);
+  }
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    setSearchError(null);
+    const county = parseCountySearch(searchInput);
+    if (!county) {
+      setSearchError('Enter "County Name, State" — e.g. Travis County, TX');
+      return;
+    }
+    setSearchInput("");
+    investigateCounty(county);
   }
 
   async function investigateCounty(county: CountyInfo, attemptNum = 1) {
@@ -364,11 +413,31 @@ function CountyExplorer() {
   return (
     <div className="space-y-6">
       <p className="text-slate-400 max-w-2xl leading-relaxed no-print">
-        Click any county on the map to investigate its public education data integration ecosystem —
-        from preschool through K-12 — including state longitudinal data systems, early childhood
-        integrated data systems, kindergarten entry assessments, cross-sector data linkages, and
-        the vendors and laws that govern how student data flows.
+        Click any county on the map — or type a county name below — to investigate its public
+        education data integration ecosystem from preschool through K-12.
       </p>
+
+      {/* ── County text search ──────────────────────────────────────────── */}
+      <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2 max-w-lg no-print">
+        <input
+          type="text"
+          value={searchInput}
+          onChange={e => { setSearchInput(e.target.value); setSearchError(null); }}
+          placeholder="e.g. Travis County, TX"
+          disabled={loading}
+          className="flex-1 bg-slate-800 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+        />
+        <button
+          type="submit"
+          disabled={loading || !searchInput.trim()}
+          className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-sm font-medium transition-colors"
+        >
+          Search
+        </button>
+      </form>
+      {searchError && (
+        <p className="text-xs text-red-400 -mt-2 no-print">{searchError}</p>
+      )}
 
       <USCountyMap
         onCountySelect={(c) => investigateCounty(c)}
