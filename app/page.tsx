@@ -105,7 +105,7 @@ function MapSkeleton() {
 
 type AppMode = "vendor" | "county";
 
-const VENDOR_EXAMPLES = ["ClassDojo", "Seesaw", "Remind", "Canvas LMS", "Duolingo"];
+const VENDOR_EXAMPLES = ["Teaching Strategies", "Kickboard", "ClassDojo", "Seesaw", "Canvas LMS"];
 
 // ── Vendor Analyzer tab ───────────────────────────────────────────────────────
 
@@ -199,10 +199,9 @@ function VendorAnalyzer() {
 
   return (
     <div className="space-y-6">
-      <p className="text-slate-600 max-w-2xl leading-relaxed no-print">
-        Enter an edtech vendor or app name. The AI agent investigates their privacy policy,
-        subprocessor chain, detected trackers, and company ownership — so you can ask the right
-        questions before signing a contract.
+      <p className="text-slate-600 max-w-2xl text-base leading-relaxed no-print">
+        Enter an edtech vendor or app name to retrieve their privacy policy, subprocessor chain,
+        detected trackers, company ownership, and known legal actions.
       </p>
 
       <form onSubmit={(e) => { e.preventDefault(); analyze(vendorName); }} className="space-y-3 no-print">
@@ -211,7 +210,7 @@ function VendorAnalyzer() {
             type="text"
             value={vendorName}
             onChange={(e) => setVendorName(e.target.value)}
-            placeholder="e.g. ClassDojo, Seesaw, Remind…"
+            placeholder="e.g. Teaching Strategies, Kickboard, ClassDojo…"
             disabled={loading}
             className="flex-1 px-4 py-3 rounded-xl bg-white border border-slate-300 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 disabled:opacity-50 transition-colors"
           />
@@ -412,7 +411,7 @@ function CountyExplorer() {
 
   return (
     <div className="space-y-6">
-      <p className="text-slate-600 max-w-2xl leading-relaxed no-print">
+      <p className="text-slate-600 max-w-2xl text-base leading-relaxed no-print">
         Click any county on the map — or type a county name below — to investigate its public
         education data integration ecosystem from preschool through K-12.
       </p>
@@ -501,24 +500,24 @@ export default function Home() {
       <div className="max-w-5xl mx-auto space-y-10">
 
         {/* Hero */}
-        <div className="text-center space-y-4 no-print">
-          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold tracking-wide">
+        <div className="text-center space-y-5 no-print">
+          <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-sm font-semibold tracking-wide">
             AI-powered · For schools, districts, and advocates
           </span>
-          <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-5xl font-bold text-slate-900 tracking-tight">
             Education Data Investigator
           </h1>
-          <p className="text-slate-500 max-w-xl mx-auto text-base leading-relaxed">
+          <p className="text-slate-500 max-w-xl mx-auto text-lg leading-relaxed">
             Understand how student data moves through the education system — and who controls it.
           </p>
         </div>
 
         {/* Mode tabs */}
         <div className="no-print">
-          <div className="flex gap-1 p-1 rounded-2xl bg-slate-100 border border-slate-200 max-w-lg mx-auto shadow-sm">
+          <div className="flex gap-1 p-1.5 rounded-2xl bg-slate-100 border border-slate-200 max-w-lg mx-auto shadow-sm">
             <button
               onClick={() => setMode("vendor")}
-              className={`flex-1 py-2.5 px-5 rounded-xl text-sm font-semibold transition-all ${
+              className={`flex-1 py-3 px-5 rounded-xl text-base font-semibold transition-all ${
                 mode === "vendor"
                   ? "bg-white text-slate-900 shadow-sm border border-slate-200"
                   : "text-slate-500 hover:text-slate-700 hover:bg-white/60"
@@ -528,7 +527,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => setMode("county")}
-              className={`flex-1 py-2.5 px-5 rounded-xl text-sm font-semibold transition-all ${
+              className={`flex-1 py-3 px-5 rounded-xl text-base font-semibold transition-all ${
                 mode === "county"
                   ? "bg-white text-slate-900 shadow-sm border border-slate-200"
                   : "text-slate-500 hover:text-slate-700 hover:bg-white/60"
@@ -537,7 +536,7 @@ export default function Home() {
               🗺 County Education Data
             </button>
           </div>
-          <p className="text-center text-xs text-slate-400 mt-2.5">
+          <p className="text-center text-sm text-slate-400 mt-3">
             {mode === "vendor"
               ? "Analyze a specific edtech app's data flows, subprocessors, and ownership"
               : "Map public education data infrastructure — SLDS, ECIDS, KEA, cross-sector linkages — by county"}
