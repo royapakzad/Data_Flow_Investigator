@@ -84,6 +84,19 @@ export interface CompanyOwnership {
   ownershipNotes: string;               // any additional verified context
 }
 
+// ── Lawsuits & Legal Actions ──────────────────────────────────────────────────
+
+export interface Lawsuit {
+  caseName: string;
+  year: number | null;
+  court: string | null;
+  plaintiff: string | null;
+  description: string;
+  outcome: string | null;
+  sourceUrl: string;
+  sourceLabel: string;
+}
+
 // ── Reddit Posts ──────────────────────────────────────────────────────────────
 
 export interface RedditPost {
@@ -127,6 +140,7 @@ export interface VendorReport {
   dataFlowNodes: DataFlowNode[];
   citations: Citation[];
   companyOwnership: CompanyOwnership;
+  lawsuits?: Lawsuit[];
   humanInLoopSteps: string[];
   diagramCode?: string;   // built programmatically from dataFlowNodes
   sources?: Source[];

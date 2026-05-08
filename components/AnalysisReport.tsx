@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { VendorReport, Citation } from "@/lib/types";
+import type { VendorReport, Citation, Lawsuit } from "@/lib/types";
 import { DataFlowDiagram } from "./DataFlowDiagram";
 import { DiscrepancyList } from "./DiscrepancyList";
 import { SubprocessorTable } from "./SubprocessorTable";
@@ -50,13 +50,13 @@ function EditableQuestions({ initialQuestions }: { initialQuestions: string[] })
       <ol className="space-y-4">
         {questions.map((q, i) => (
           <li key={i} className="flex gap-3 group">
-            <span className="shrink-0 w-7 h-7 rounded-full bg-blue-500/20 text-blue-300 text-sm font-bold flex items-center justify-center mt-0.5">
+            <span className="shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-700 text-sm font-bold flex items-center justify-center mt-0.5">
               {i + 1}
             </span>
             {editingIdx === i ? (
               <div className="flex-1 space-y-2">
                 <textarea
-                  className="w-full bg-slate-800 border border-blue-500/50 rounded-lg p-2 text-slate-300 text-sm resize-none focus:outline-none focus:border-blue-400"
+                  className="w-full bg-white border border-blue-400 rounded-lg p-2 text-slate-700 text-sm resize-none focus:outline-none focus:border-blue-500"
                   rows={3}
                   value={editText}
                   onChange={e => setEditText(e.target.value)}
@@ -64,15 +64,15 @@ function EditableQuestions({ initialQuestions }: { initialQuestions: string[] })
                 />
                 <div className="flex gap-2">
                   <button onClick={() => saveEdit(i)} className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors">Save</button>
-                  <button onClick={() => setEditingIdx(null)} className="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors">Cancel</button>
+                  <button onClick={() => setEditingIdx(null)} className="px-3 py-1 text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition-colors">Cancel</button>
                 </div>
               </div>
             ) : (
               <div className="flex-1 flex items-start justify-between gap-2">
-                <p className="text-slate-300 text-sm leading-relaxed pt-0.5 flex-1">{q}</p>
+                <p className="text-slate-700 text-sm leading-relaxed pt-0.5 flex-1">{q}</p>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 pt-0.5">
-                  <button onClick={() => startEdit(i)} title="Edit" className="p-1 text-slate-500 hover:text-blue-400 transition-colors text-base leading-none">✎</button>
-                  <button onClick={() => deleteQuestion(i)} title="Delete" className="p-1 text-slate-500 hover:text-red-400 transition-colors text-base leading-none">✕</button>
+                  <button onClick={() => startEdit(i)} title="Edit" className="p-1 text-slate-400 hover:text-blue-600 transition-colors text-base leading-none">✎</button>
+                  <button onClick={() => deleteQuestion(i)} title="Delete" className="p-1 text-slate-400 hover:text-red-600 transition-colors text-base leading-none">✕</button>
                 </div>
               </div>
             )}
@@ -82,12 +82,12 @@ function EditableQuestions({ initialQuestions }: { initialQuestions: string[] })
 
       {addingNew ? (
         <div className="flex gap-3">
-          <span className="shrink-0 w-7 h-7 rounded-full bg-blue-500/20 text-blue-300 text-sm font-bold flex items-center justify-center mt-0.5">
+          <span className="shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-700 text-sm font-bold flex items-center justify-center mt-0.5">
             {questions.length + 1}
           </span>
           <div className="flex-1 space-y-2">
             <textarea
-              className="w-full bg-slate-800 border border-blue-500/50 rounded-lg p-2 text-slate-300 text-sm resize-none focus:outline-none focus:border-blue-400"
+              className="w-full bg-white border border-blue-400 rounded-lg p-2 text-slate-700 text-sm resize-none focus:outline-none focus:border-blue-500"
               rows={3}
               value={newText}
               onChange={e => setNewText(e.target.value)}
@@ -96,16 +96,16 @@ function EditableQuestions({ initialQuestions }: { initialQuestions: string[] })
             />
             <div className="flex gap-2">
               <button onClick={addQuestion} className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors">Add</button>
-              <button onClick={() => { setAddingNew(false); setNewText(""); }} className="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors">Cancel</button>
+              <button onClick={() => { setAddingNew(false); setNewText(""); }} className="px-3 py-1 text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition-colors">Cancel</button>
             </div>
           </div>
         </div>
       ) : (
         <button
           onClick={() => setAddingNew(true)}
-          className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-400 transition-colors"
+          className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 transition-colors"
         >
-          <span className="w-7 h-7 rounded-full border border-dashed border-slate-600 hover:border-blue-500 flex items-center justify-center text-lg leading-none">+</span>
+          <span className="w-7 h-7 rounded-full border border-dashed border-slate-300 hover:border-blue-500 flex items-center justify-center text-lg leading-none">+</span>
           Add a question
         </button>
       )}
@@ -121,8 +121,8 @@ function Section({ id, title, children, subtitle }: {
 }) {
   return (
     <section id={id} className="space-y-4 scroll-mt-6">
-      <div className="border-b border-slate-700 pb-2 space-y-0.5">
-        <h2 className="text-lg font-semibold text-slate-200">{title}</h2>
+      <div className="border-b border-slate-200 pb-2 space-y-0.5">
+        <h2 className="text-lg font-semibold text-slate-800">{title}</h2>
         {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
       </div>
       {children}
@@ -137,13 +137,13 @@ function CiteBadge({ citation }: { citation: Citation }) {
       href={`#citation-${citation.number}`}
       className="group relative inline-flex items-center mx-0.5 align-super"
     >
-      <span className="text-[10px] font-mono font-bold text-blue-400 bg-blue-500/15 border border-blue-500/30 px-1 py-0.5 rounded hover:bg-blue-500/30 transition-colors leading-none">
+      <span className="text-[10px] font-mono font-bold text-blue-600 bg-blue-50 border border-blue-300 px-1 py-0.5 rounded hover:bg-blue-100 transition-colors leading-none">
         [{citation.number}]
       </span>
-      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col w-72 bg-slate-800 border border-slate-600 rounded-xl p-3 text-xs z-50 shadow-2xl gap-1.5">
-        <span className="font-semibold text-blue-300">{citation.label}</span>
-        <span className="text-slate-300 leading-relaxed">{citation.context}</span>
-        <span className="text-slate-500 truncate font-mono text-[10px]">{citation.url}</span>
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col w-72 bg-white border border-slate-200 rounded-xl p-3 text-xs z-50 shadow-2xl gap-1.5">
+        <span className="font-semibold text-blue-700">{citation.label}</span>
+        <span className="text-slate-700 leading-relaxed">{citation.context}</span>
+        <span className="text-slate-400 truncate font-mono text-[10px]">{citation.url}</span>
       </span>
     </a>
   );
@@ -169,7 +169,7 @@ function DocPill({ href, label, cite }: { href: string; label: string; cite?: Ci
   return (
     <div className="flex items-center gap-1">
       <a href={href} target="_blank" rel="noopener noreferrer"
-        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-blue-400 hover:border-blue-500 hover:bg-slate-800/80 transition-colors">
+        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-slate-200 text-sm text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition-colors">
         {label} <span className="text-slate-500">↗</span>
       </a>
       {cite && <CiteBadge citation={cite} />}
@@ -188,7 +188,7 @@ function CitationsList({ citations }: { citations: Citation[] }) {
             href={c.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="shrink-0 w-8 h-8 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-400 text-xs font-mono font-bold flex items-center justify-center hover:bg-blue-500/30 transition-colors mt-0.5"
+            className="shrink-0 w-8 h-8 rounded-lg bg-blue-50 border border-blue-300 text-blue-600 text-xs font-mono font-bold flex items-center justify-center hover:bg-blue-100 transition-colors mt-0.5"
           >
             {c.number}
           </a>
@@ -197,12 +197,12 @@ function CitationsList({ citations }: { citations: Citation[] }) {
               href={c.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-blue-300 hover:text-blue-200 hover:underline text-sm leading-tight"
+              className="font-semibold text-blue-700 hover:text-blue-600 hover:underline text-sm leading-tight"
             >
               {c.label} ↗
             </a>
-            <p className="text-sm text-slate-300 leading-relaxed">{c.context}</p>
-            <p className="text-[11px] text-slate-600 font-mono truncate">{c.url}</p>
+            <p className="text-sm text-slate-700 leading-relaxed">{c.context}</p>
+            <p className="text-[11px] text-slate-400 font-mono truncate">{c.url}</p>
           </div>
         </li>
       ))}
@@ -210,11 +210,43 @@ function CitationsList({ citations }: { citations: Citation[] }) {
   );
 }
 
+// ── Lawsuits list ─────────────────────────────────────────────────────────────
+function LawsuitsList({ lawsuits }: { lawsuits: Lawsuit[] }) {
+  return (
+    <div className="space-y-4">
+      {lawsuits.map((l, i) => (
+        <div key={i} className="rounded-xl border border-red-200 bg-red-50 p-5 space-y-3">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="space-y-0.5">
+              <p className="font-semibold text-slate-800 text-sm">{l.caseName}</p>
+              <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+                {l.year && <span>{l.year}</span>}
+                {l.court && <span>· {l.court}</span>}
+                {l.plaintiff && <span>· Plaintiff: {l.plaintiff}</span>}
+              </div>
+            </div>
+            {l.outcome && (
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-white border border-red-200 text-red-700 shrink-0">
+                {l.outcome}
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-slate-700 leading-relaxed">{l.description}</p>
+          <a href={l.sourceUrl} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline">
+            Source: {l.sourceLabel} ↗
+          </a>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Risk badge ────────────────────────────────────────────────────────────────
 const RISK_STYLES = {
-  elevated:      "bg-red-500/20 text-red-300 border-red-500/40",
-  standard:      "bg-yellow-500/20 text-yellow-300 border-yellow-500/40",
-  "low-concern": "bg-green-500/20 text-green-300 border-green-500/40",
+  elevated:      "bg-red-100 text-red-700 border-red-300",
+  standard:      "bg-yellow-100 text-yellow-700 border-yellow-300",
+  "low-concern": "bg-green-100 text-green-700 border-green-300",
 };
 const RISK_LABELS = {
   elevated:      "⚠ Elevated Concern",
@@ -233,11 +265,11 @@ export function AnalysisReport({ report }: Props) {
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold text-white">{report.vendorName}</h1>
+          <h1 className="text-3xl font-bold text-slate-900">{report.vendorName}</h1>
           {report.appName !== report.vendorName && (
-            <p className="text-slate-400 text-sm mt-1">App: {report.appName}</p>
+            <p className="text-slate-500 text-sm mt-1">App: {report.appName}</p>
           )}
-          <p className="text-xs text-slate-600 mt-1">
+          <p className="text-xs text-slate-400 mt-1">
             Analysis date: {new Date(report.analysisDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
           </p>
         </div>
@@ -253,6 +285,18 @@ export function AnalysisReport({ report }: Props) {
           <CompanyHistory ownership={report.companyOwnership} />
         </Section>
       )}
+
+      {/* ── Lawsuits & Legal Actions ───────────────────────────────────── */}
+      <Section title="Lawsuits & Legal Actions"
+        subtitle="Known lawsuits, regulatory actions, or settlements against the company or its parent. Empty means none were found in public sources — not a guarantee none exist.">
+        {report.lawsuits && report.lawsuits.length > 0 ? (
+          <LawsuitsList lawsuits={report.lawsuits} />
+        ) : (
+          <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-green-700 text-sm">
+            No lawsuits or regulatory actions found in public sources during this analysis. Verify independently before relying on this finding.
+          </div>
+        )}
+      </Section>
 
       {/* ── Source Documents ───────────────────────────────────────────── */}
       {(docs.privacyPolicyUrl || docs.dpaUrl || docs.subprocessorListUrl || docs.appStoreUrl || docs.playStoreUrl) && (
@@ -301,12 +345,12 @@ export function AnalysisReport({ report }: Props) {
           subtitle="SDKs found in the Android app that were not declared in privacy documentation.">
           <div className="flex flex-wrap gap-2">
             {report.trackers.map((t, i) => (
-              <div key={i} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
+              <div key={i} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-50 border border-red-200">
                 {t.website ? (
                   <a href={t.website} target="_blank" rel="noopener noreferrer"
-                    className="font-medium text-red-300 hover:underline text-sm">{t.name}</a>
+                    className="font-medium text-red-700 hover:underline text-sm">{t.name}</a>
                 ) : (
-                  <span className="font-medium text-red-300 text-sm">{t.name}</span>
+                  <span className="font-medium text-red-700 text-sm">{t.name}</span>
                 )}
                 <span className="text-xs text-slate-500">{t.category}</span>
                 {t.website && getCite(t.website) && <CiteBadge citation={getCite(t.website)!} />}
@@ -325,10 +369,10 @@ export function AnalysisReport({ report }: Props) {
       {/* ── Human-in-loop ──────────────────────────────────────────────── */}
       <Section title="Steps Requiring Human Verification"
         subtitle="Things this automated analysis cannot do — requiring a qualified human reviewer.">
-        <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 p-5 space-y-3">
+        <div className="rounded-xl bg-amber-50 border border-amber-200 p-5 space-y-3">
           {report.humanInLoopSteps.map((step, i) => (
-            <div key={i} className="flex gap-3 text-sm text-slate-300">
-              <span className="text-amber-400 font-bold shrink-0">→</span>
+            <div key={i} className="flex gap-3 text-sm text-slate-700">
+              <span className="text-amber-600 font-bold shrink-0">→</span>
               <p className="leading-relaxed">{step}</p>
             </div>
           ))}

@@ -85,7 +85,7 @@ export function USCountyMap({ onCountySelect, selectedFips, loading }: Props) {
   );
 
   return (
-    <div className="relative w-full bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden select-none">
+    <div className="relative w-full bg-slate-100 rounded-2xl border border-slate-200 overflow-hidden select-none">
       {/* Map */}
       <ComposableMap
         projection="geoAlbersUsa"
@@ -108,16 +108,16 @@ export function USCountyMap({ onCountySelect, selectedFips, loading }: Props) {
                   onMouseLeave={() => setTooltip(null)}
                   style={{
                     default: {
-                      fill: isSelected ? "#2563eb" : "#1e293b",
-                      stroke: "#0f172a",
+                      fill: isSelected ? "#2563eb" : "#cbd5e1",
+                      stroke: "#94a3b8",
                       strokeWidth: 0.3,
                       outline: "none",
                       cursor: loading ? "not-allowed" : "pointer",
                       transition: "fill 0.1s",
                     },
                     hover: {
-                      fill: isSelected ? "#1d4ed8" : "#334155",
-                      stroke: "#475569",
+                      fill: isSelected ? "#1d4ed8" : "#94a3b8",
+                      stroke: "#64748b",
                       strokeWidth: 0.5,
                       outline: "none",
                       cursor: loading ? "not-allowed" : "pointer",
@@ -141,8 +141,8 @@ export function USCountyMap({ onCountySelect, selectedFips, loading }: Props) {
                 key={geo.rsmKey}
                 geography={geo}
                 style={{
-                  default: { fill: "none", stroke: "#475569", strokeWidth: 0.8, outline: "none", pointerEvents: "none" },
-                  hover:   { fill: "none", stroke: "#475569", strokeWidth: 0.8, outline: "none" },
+                  default: { fill: "none", stroke: "#475569", strokeWidth: 1.2, outline: "none", pointerEvents: "none" },
+                  hover:   { fill: "none", stroke: "#475569", strokeWidth: 1.2, outline: "none" },
                   pressed: { fill: "none", outline: "none" },
                 }}
               />
@@ -154,7 +154,7 @@ export function USCountyMap({ onCountySelect, selectedFips, loading }: Props) {
       {/* Legend */}
       <div className="absolute bottom-3 left-3 flex items-center gap-4 text-xs text-slate-500">
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-slate-700 border border-slate-600 inline-block" />
+          <span className="w-3 h-3 rounded-sm bg-slate-400 border border-slate-500 inline-block" />
           Click a county to analyze
         </span>
         {selectedFips && (
@@ -166,10 +166,10 @@ export function USCountyMap({ onCountySelect, selectedFips, loading }: Props) {
       </div>
 
       {loading && (
-        <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center rounded-2xl backdrop-blur-sm">
-          <div className="flex items-center gap-3 bg-slate-800 border border-slate-700 rounded-xl px-5 py-3">
+        <div className="absolute inset-0 bg-white/60 flex items-center justify-center rounded-2xl backdrop-blur-sm">
+          <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-5 py-3 shadow-md">
             <div className="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
-            <span className="text-slate-300 text-sm">Investigating data systems...</span>
+            <span className="text-slate-700 text-sm">Investigating data systems...</span>
           </div>
         </div>
       )}
@@ -177,13 +177,13 @@ export function USCountyMap({ onCountySelect, selectedFips, loading }: Props) {
       {/* Tooltip (fixed, follows cursor) */}
       {tooltip && (
         <div
-          className="fixed z-50 pointer-events-none bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 shadow-xl"
+          className="fixed z-50 pointer-events-none bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-xl"
           style={{ left: tooltip.x + 14, top: tooltip.y - 48 }}
         >
-          <p className="font-semibold text-white text-sm leading-tight">
+          <p className="font-semibold text-slate-900 text-sm leading-tight">
             {tooltip.name} County
           </p>
-          <p className="text-slate-400 text-xs mt-0.5">{tooltip.state}</p>
+          <p className="text-slate-500 text-xs mt-0.5">{tooltip.state}</p>
         </div>
       )}
     </div>

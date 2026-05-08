@@ -142,6 +142,12 @@ PART 6 — COMPANY OWNERSHIP RESEARCH (always do this — schools must know who 
 29. For any acquisition found, search "[acquirer] acquires [vendor] [year]" to find the original news article or press release
 30. If a major acquisition is found, fetch the original announcement URL to verify details
 
+PART 7 — LAWSUITS & LEGAL ACTIONS (important for schools — helps identify past privacy violations):
+31. Search "[vendor] lawsuit" and "[vendor] legal action" and "[vendor] FTC complaint" and "[vendor] privacy lawsuit"
+32. Search "[vendor] settlement" and "[vendor] class action" and "[vendor] FERPA violation"
+33. If a parent company was found: search "[parent company] lawsuit student data" and "[parent company] privacy settlement"
+34. For any significant lawsuit or settlement found, fetch the source URL to verify details and outcome
+
 After gathering data, output a JSON object matching this schema EXACTLY:
 
 {
@@ -213,6 +219,19 @@ After gathering data, output a JSON object matching this schema EXACTLY:
     "ownershipNotes": string
   },
 
+  "lawsuits": [
+    {
+      "caseName": string,         // case or action name e.g. "Smith v. ClassDojo Inc." or "FTC v. [vendor]"
+      "year": number | null,      // year filed or settled
+      "court": string | null,     // e.g. "N.D. Cal." or "FTC" or "New York AG"
+      "plaintiff": string | null, // who brought the suit (individuals, class, regulator)
+      "description": string,      // one-paragraph summary of what was alleged
+      "outcome": string | null,   // e.g. "Settled for $X", "Dismissed", "Ongoing", "Consent decree"
+      "sourceUrl": string,        // MUST be a real URL you found: news article, court filing, FTC complaint, AG press release
+      "sourceLabel": string       // e.g. "FTC Press Release", "NYT", "CourtListener", "State AG Office"
+    }
+  ],
+
   "dataFlowNodes": [
     {
       "id": string,
@@ -260,6 +279,7 @@ ANTI-HALLUCINATION RULES — strictly enforced:
 - dataFlowNodes source "declared": ONLY use this when you read the actual document and found the vendor named in it. Set url to that document URL.
 - dataFlowNodes source "inferred": acceptable for downstream SIS/state nodes based on known industry patterns. Set url to null or an integration page if found. Never mark inferred as declared or detected.
 - NEVER invent acquisition years, prices, or acquirer names — only report what you verified from a source URL
+- lawsuits: ONLY include entries where you found and verified a real source URL (court filing, news article, FTC/AG press release). If you cannot find a verifiable source URL for a lawsuit, omit it. An empty array is correct when no verified lawsuit is found. Never invent case names, outcomes, or settlement amounts.
 
 For vendorQuestions: 5-8 specific, pointed questions for a procurement officer based on actual gaps found — especially around AI/ML tool use, undisclosed third parties, and what happens to student data when a subprocessor uses it to train models.
 For humanInLoopSteps: 3-5 steps requiring human verification (dynamic traffic capture, DPA legal review, contractual audit rights, etc.).

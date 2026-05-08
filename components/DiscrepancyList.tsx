@@ -2,21 +2,21 @@ import type { VendorReport } from "@/lib/types";
 import { clsx } from "clsx";
 
 const SEVERITY_STYLES = {
-  high: "bg-red-500/10 border-red-500/30 text-red-300",
-  medium: "bg-yellow-500/10 border-yellow-500/30 text-yellow-300",
-  low: "bg-slate-700/50 border-slate-600 text-slate-300",
+  high: "bg-red-50 border-red-200 text-red-800",
+  medium: "bg-yellow-50 border-yellow-200 text-yellow-800",
+  low: "bg-slate-50 border-slate-200 text-slate-700",
 };
 
 const SEVERITY_BADGE = {
-  high: "bg-red-500/20 text-red-300",
-  medium: "bg-yellow-500/20 text-yellow-300",
-  low: "bg-slate-600 text-slate-300",
+  high: "bg-red-100 text-red-700",
+  medium: "bg-yellow-100 text-yellow-700",
+  low: "bg-slate-200 text-slate-700",
 };
 
 export function DiscrepancyList({ report }: { report: VendorReport }) {
   if (report.discrepancies.length === 0) {
     return (
-      <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 text-green-300 text-sm">
+      <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-green-700 text-sm">
         No discrepancies detected between declared and identified data practices.
       </div>
     );

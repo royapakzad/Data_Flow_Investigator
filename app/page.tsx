@@ -10,7 +10,7 @@ import { ReportActions } from "@/components/ReportActions";
 
 // ── Progress panel ────────────────────────────────────────────────────────────
 
-const ESTIMATED_STEPS = { vendor: 30, county: 28 };
+const ESTIMATED_STEPS = { vendor: 34, county: 28 };
 
 function ProgressPanel({
   log,
@@ -34,18 +34,18 @@ function ProgressPanel({
   const history = log.slice(-5, -1).reverse();
 
   return (
-    <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-5 space-y-4 no-print">
+    <div className="bg-slate-100 border border-slate-200 rounded-2xl p-5 space-y-4 no-print">
       {/* Header row */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin shrink-0" />
-          <span className="text-slate-200 text-sm font-semibold">
+          <span className="text-slate-800 text-sm font-semibold">
             {isCompiling ? "Compiling report…" : "Agent is investigating"}
           </span>
         </div>
         <button
           onClick={onCancel}
-          className="text-xs text-slate-500 hover:text-slate-300 transition-colors px-2 py-1 rounded hover:bg-slate-700"
+          className="text-xs text-slate-500 hover:text-slate-700 transition-colors px-2 py-1 rounded hover:bg-slate-200"
         >
           Cancel
         </button>
@@ -54,10 +54,10 @@ function ProgressPanel({
       {/* Progress bar */}
       <div className="space-y-1.5">
         <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-          <span>{isCompiling ? "Generating JSON output…" : `Step ${current} of ~${total}`}</span>
+          <span className="text-slate-500">{isCompiling ? "Generating JSON output…" : `Step ${current} of ~${total}`}</span>
           <span>{isCompiling ? "95%" : `${pct}%`}</span>
         </div>
-        <div className="h-1.5 rounded-full bg-slate-700 overflow-hidden">
+        <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
           <div
             className="h-full rounded-full bg-blue-500 transition-all duration-700"
             style={{ width: `${isCompiling ? 95 : pct}%` }}
@@ -66,16 +66,16 @@ function ProgressPanel({
       </div>
 
       {/* Current step */}
-      <div className="rounded-xl bg-slate-900/60 border border-slate-700 px-4 py-3">
+      <div className="rounded-xl bg-white border border-slate-200 px-4 py-3">
         <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Current</p>
-        <p className="text-slate-200 text-sm leading-snug font-mono break-all">{displayLabel}</p>
+        <p className="text-slate-800 text-sm leading-snug font-mono break-all">{displayLabel}</p>
       </div>
 
       {/* Recent history */}
       {history.length > 0 && (
         <div className="space-y-1">
           {history.map((msg, i) => (
-            <p key={i} className="text-[11px] text-slate-600 font-mono truncate pl-1">
+            <p key={i} className="text-[11px] text-slate-400 font-mono truncate pl-1">
               {msg.replace(/^\[\d+\]\s*/, "")}
             </p>
           ))}
@@ -93,10 +93,10 @@ const USCountyMap = dynamic(
 
 function MapSkeleton() {
   return (
-    <div className="w-full rounded-2xl border border-slate-700 bg-slate-900 flex items-center justify-center"
+    <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-center"
       style={{ height: 420 }}>
       <div className="flex items-center gap-3 text-slate-500 text-sm">
-        <div className="w-4 h-4 rounded-full border-2 border-slate-600 border-t-slate-400 animate-spin" />
+        <div className="w-4 h-4 rounded-full border-2 border-slate-300 border-t-slate-500 animate-spin" />
         Loading map…
       </div>
     </div>
@@ -199,7 +199,7 @@ function VendorAnalyzer() {
 
   return (
     <div className="space-y-6">
-      <p className="text-slate-400 max-w-2xl leading-relaxed no-print">
+      <p className="text-slate-600 max-w-2xl leading-relaxed no-print">
         Enter an edtech vendor or app name. The AI agent investigates their privacy policy,
         subprocessor chain, detected trackers, and company ownership — so you can ask the right
         questions before signing a contract.
@@ -213,7 +213,7 @@ function VendorAnalyzer() {
             onChange={(e) => setVendorName(e.target.value)}
             placeholder="e.g. ClassDojo, Seesaw, Remind…"
             disabled={loading}
-            className="flex-1 px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 disabled:opacity-50 transition-colors"
+            className="flex-1 px-4 py-3 rounded-xl bg-white border border-slate-300 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 disabled:opacity-50 transition-colors"
           />
           <button type="submit" disabled={loading || !vendorName.trim()}
             className="px-6 py-3 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
@@ -224,7 +224,7 @@ function VendorAnalyzer() {
           {VENDOR_EXAMPLES.map((ex) => (
             <button key={ex} type="button" disabled={loading}
               onClick={() => { setVendorName(ex); analyze(ex); }}
-              className="px-3 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 text-sm hover:border-slate-500 hover:text-slate-300 disabled:opacity-40 transition-colors">
+              className="px-3 py-1 rounded-lg bg-white border border-slate-300 text-slate-600 text-sm hover:border-slate-400 hover:text-slate-800 disabled:opacity-40 transition-colors">
               {ex}
             </button>
           ))}
@@ -240,19 +240,19 @@ function VendorAnalyzer() {
       )}
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-sm space-y-3 no-print">
-          <p className="text-red-300">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm space-y-3 no-print">
+          <p className="text-red-700">
             <strong>Error after {attempt} attempt{attempt > 1 ? "s" : ""}:</strong> {error}
           </p>
           <button onClick={() => analyze(vendorName)}
-            className="px-4 py-2 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm hover:bg-red-500/30 transition-colors">
+            className="px-4 py-2 rounded-lg bg-red-100 border border-red-200 text-red-700 text-sm hover:bg-red-200 transition-colors">
             Try again
           </button>
         </div>
       )}
 
       {report && (
-        <div className="border-t border-slate-700 pt-10 space-y-6">
+        <div className="border-t border-slate-200 pt-10 space-y-6">
           <ReportActions type="vendor" report={report} />
           <AnalysisReport report={report} />
         </div>
@@ -412,7 +412,7 @@ function CountyExplorer() {
 
   return (
     <div className="space-y-6">
-      <p className="text-slate-400 max-w-2xl leading-relaxed no-print">
+      <p className="text-slate-600 max-w-2xl leading-relaxed no-print">
         Click any county on the map — or type a county name below — to investigate its public
         education data integration ecosystem from preschool through K-12.
       </p>
@@ -425,7 +425,7 @@ function CountyExplorer() {
           onChange={e => { setSearchInput(e.target.value); setSearchError(null); }}
           placeholder="e.g. Travis County, TX"
           disabled={loading}
-          className="flex-1 bg-slate-800 border border-slate-600 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+          className="flex-1 bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 disabled:opacity-50"
         />
         <button
           type="submit"
@@ -447,7 +447,7 @@ function CountyExplorer() {
 
       {selectedCounty && !report && !loading && (
         <p className="text-center text-xs text-slate-500 no-print">
-          Selected: <span className="text-slate-300 font-medium">{selectedCounty.name} County, {selectedCounty.stateName}</span>
+          Selected: <span className="text-slate-700 font-medium">{selectedCounty.name} County, {selectedCounty.stateName}</span>
         </p>
       )}
 
@@ -460,13 +460,13 @@ function CountyExplorer() {
       )}
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-sm space-y-3 no-print">
-          <p className="text-red-300">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm space-y-3 no-print">
+          <p className="text-red-700">
             <strong>Error after {attempt} attempt{attempt > 1 ? "s" : ""}:</strong> {error}
           </p>
           {selectedCounty && (
             <button onClick={() => investigateCounty(selectedCounty)}
-              className="px-4 py-2 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm hover:bg-red-500/30 transition-colors">
+              className="px-4 py-2 rounded-lg bg-red-100 border border-red-200 text-red-700 text-sm hover:bg-red-200 transition-colors">
               Try again
             </button>
           )}
@@ -474,7 +474,7 @@ function CountyExplorer() {
       )}
 
       {report && (
-        <div className="border-t border-slate-700 pt-10 space-y-6">
+        <div className="border-t border-slate-200 pt-10 space-y-6">
           <ReportActions type="county" report={report} />
           <CountyReportView report={report} />
         </div>
@@ -502,26 +502,26 @@ export default function Home() {
 
         {/* Hero */}
         <div className="text-center space-y-3 no-print">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs font-medium mb-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium mb-2">
             AI-powered · For schools, districts, and advocates
           </div>
-          <h1 className="text-4xl font-bold text-white tracking-tight">
+          <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
             Education Data Investigator
           </h1>
-          <p className="text-slate-400 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-slate-600 max-w-2xl mx-auto leading-relaxed">
             Two tools for understanding how student data moves through the education system —
             and who controls it.
           </p>
         </div>
 
         {/* Mode tabs */}
-        <div className="flex gap-1 p-1 rounded-xl bg-slate-800 border border-slate-700 max-w-xl mx-auto no-print">
+        <div className="flex gap-1 p-1 rounded-xl bg-slate-100 border border-slate-200 max-w-xl mx-auto no-print">
           <button
             onClick={() => setMode("vendor")}
             className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${
               mode === "vendor"
                 ? "bg-blue-600 text-white shadow"
-                : "text-slate-400 hover:text-slate-300"
+                : "text-slate-500 hover:text-slate-700"
             }`}
           >
             🔍 Vendor Analyzer
@@ -531,7 +531,7 @@ export default function Home() {
             className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${
               mode === "county"
                 ? "bg-blue-600 text-white shadow"
-                : "text-slate-400 hover:text-slate-300"
+                : "text-slate-500 hover:text-slate-700"
             }`}
           >
             🗺 County Education Data
