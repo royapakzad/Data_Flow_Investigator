@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #f1f5f9;
+  color: #0f172a;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ── Print / PDF styles ─────────────────────────────────────────────────────── */
+
+.print-only { display: none; }
+
+@media print {
+  /* Hide all interactive chrome */
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+
+  /* Page setup */
+  @page {
+    margin: 1.5cm 1.8cm;
+    size: A4;
+  }
+
+  /* Render on white */
+  html, body {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+    font-size: 11pt;
+  }
+
+  /* Remove shadows and translucent backgrounds */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* All backgrounds → white for print */
+  * {
+    background-color: transparent !important;
+  }
+  .bg-white, [class*="bg-slate-"], [class*="bg-blue-"], [class*="bg-red-"],
+  [class*="bg-amber-"], [class*="bg-emerald-"], [class*="bg-purple-"] {
+    background-color: #ffffff !important;
+  }
+
+  /* Keep border visibility */
+  [class*="border-"] {
+    border-color: #e2e8f0 !important;
+  }
+
+  /* All text → dark for readability */
+  * { color: #1e293b !important; }
+
+  /* Keep semantic accent colors (blue, red, green, amber) for badges */
+  [class*="text-blue-"] { color: #1d4ed8 !important; }
+  [class*="text-red-"]  { color: #b91c1c !important; }
+  [class*="text-emerald-"] { color: #065f46 !important; }
+  [class*="text-amber-"]   { color: #92400e !important; }
+  [class*="text-purple-"]  { color: #6b21a8 !important; }
+
+  /* Avoid page breaks inside cards */
+  section, .rounded-xl, .rounded-2xl {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Section headings: new page if near bottom */
+  h2 { break-after: avoid; page-break-after: avoid; }
+
+  /* Links: show URL after text */
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 8pt;
+    color: #64748b;
+    word-break: break-all;
+  }
+
+  /* But NOT for badge/icon links */
+  a.group::after, a[class*="rounded"]::after { content: none; }
+}
