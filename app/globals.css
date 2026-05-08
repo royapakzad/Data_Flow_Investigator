@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 body {
-  background-color: #f8fafc;
-  color: #1e293b;
+  background-color: #f1f5f9;
+  color: #0f172a;
   font-family: ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -36,30 +36,22 @@ body {
     text-shadow: none !important;
   }
 
-  /* Convert dark backgrounds → white or very light */
-  [class*="bg-slate-9"],
-  [class*="bg-slate-8"],
-  [class*="bg-slate-7"] {
-    background-color: #f8fafc !important;
+  /* All backgrounds → white for print */
+  * {
+    background-color: transparent !important;
+  }
+  .bg-white, [class*="bg-slate-"], [class*="bg-blue-"], [class*="bg-red-"],
+  [class*="bg-amber-"], [class*="bg-emerald-"], [class*="bg-purple-"] {
+    background-color: #ffffff !important;
   }
 
-  /* Border colors → light gray */
-  [class*="border-slate-7"],
-  [class*="border-slate-6"] {
-    border-color: #cbd5e1 !important;
+  /* Keep border visibility */
+  [class*="border-"] {
+    border-color: #e2e8f0 !important;
   }
 
-  /* Text colors — keep semantic colors but darken for readability */
-  [class*="text-slate-2"],
-  [class*="text-slate-3"],
-  [class*="text-slate-4"],
-  [class*="text-white"] {
-    color: #1e293b !important;
-  }
-  [class*="text-slate-5"],
-  [class*="text-slate-6"] {
-    color: #475569 !important;
-  }
+  /* All text → dark for readability */
+  * { color: #1e293b !important; }
 
   /* Keep semantic accent colors (blue, red, green, amber) for badges */
   [class*="text-blue-"] { color: #1d4ed8 !important; }

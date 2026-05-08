@@ -120,11 +120,12 @@ function Section({ id, title, children, subtitle }: {
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="space-y-4 scroll-mt-6">
-      <div className="border-b border-slate-200 pb-2 space-y-0.5">
-        <h2 className="text-lg font-semibold text-slate-800">{title}</h2>
-        {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
+    <section id={id} className="space-y-5 scroll-mt-6">
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold text-slate-900 tracking-tight">{title}</h2>
+        {subtitle && <p className="text-sm text-slate-500 leading-relaxed">{subtitle}</p>}
       </div>
+      <div className="border-t border-slate-100" />
       {children}
     </section>
   );
@@ -169,8 +170,8 @@ function DocPill({ href, label, cite }: { href: string; label: string; cite?: Ci
   return (
     <div className="flex items-center gap-1">
       <a href={href} target="_blank" rel="noopener noreferrer"
-        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-slate-200 text-sm text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition-colors">
-        {label} <span className="text-slate-500">↗</span>
+        className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-white border border-slate-200 shadow-sm text-sm font-medium text-blue-700 hover:border-blue-300 hover:bg-blue-50 hover:shadow transition-all">
+        {label} <span className="text-blue-400 text-xs">↗</span>
       </a>
       {cite && <CiteBadge citation={cite} />}
     </div>
@@ -369,13 +370,16 @@ export function AnalysisReport({ report }: Props) {
       {/* ── Human-in-loop ──────────────────────────────────────────────── */}
       <Section title="Steps Requiring Human Verification"
         subtitle="Things this automated analysis cannot do — requiring a qualified human reviewer.">
-        <div className="rounded-xl bg-amber-50 border border-amber-200 p-5 space-y-3">
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <div className="h-1 bg-amber-400" />
+          <div className="p-5 space-y-3">
           {report.humanInLoopSteps.map((step, i) => (
             <div key={i} className="flex gap-3 text-sm text-slate-700">
-              <span className="text-amber-600 font-bold shrink-0">→</span>
+              <span className="text-amber-500 font-bold shrink-0 mt-0.5">→</span>
               <p className="leading-relaxed">{step}</p>
             </div>
           ))}
+          </div>
         </div>
       </Section>
 

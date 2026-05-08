@@ -34,7 +34,7 @@ function ProgressPanel({
   const history = log.slice(-5, -1).reverse();
 
   return (
-    <div className="bg-slate-100 border border-slate-200 rounded-2xl p-5 space-y-4 no-print">
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm no-print">
       {/* Header row */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -498,58 +498,50 @@ export default function Home() {
 
   return (
     <main className="min-h-screen py-12 px-4">
-      <div className="max-w-5xl mx-auto space-y-8">
+      <div className="max-w-5xl mx-auto space-y-10">
 
         {/* Hero */}
-        <div className="text-center space-y-3 no-print">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium mb-2">
+        <div className="text-center space-y-4 no-print">
+          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold tracking-wide">
             AI-powered · For schools, districts, and advocates
-          </div>
+          </span>
           <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
             Education Data Investigator
           </h1>
-          <p className="text-slate-600 max-w-2xl mx-auto leading-relaxed">
-            Two tools for understanding how student data moves through the education system —
-            and who controls it.
+          <p className="text-slate-500 max-w-xl mx-auto text-base leading-relaxed">
+            Understand how student data moves through the education system — and who controls it.
           </p>
         </div>
 
         {/* Mode tabs */}
-        <div className="flex gap-1 p-1 rounded-xl bg-slate-100 border border-slate-200 max-w-xl mx-auto no-print">
-          <button
-            onClick={() => setMode("vendor")}
-            className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${
-              mode === "vendor"
-                ? "bg-blue-600 text-white shadow"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            🔍 Vendor Analyzer
-          </button>
-          <button
-            onClick={() => setMode("county")}
-            className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${
-              mode === "county"
-                ? "bg-blue-600 text-white shadow"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            🗺 County Education Data
-          </button>
-        </div>
-
-        {/* Mode descriptions */}
-        <div className="space-y-1 text-center -mt-4 no-print">
-          {mode === "vendor" && (
-            <p className="text-xs text-slate-600">
-              Analyze a specific edtech app's data flows, subprocessors, and ownership
-            </p>
-          )}
-          {mode === "county" && (
-            <p className="text-xs text-slate-600">
-              Map public education data infrastructure — SLDS, ECIDS, KEA, cross-sector linkages — by county
-            </p>
-          )}
+        <div className="no-print">
+          <div className="flex gap-1 p-1 rounded-2xl bg-slate-100 border border-slate-200 max-w-lg mx-auto shadow-sm">
+            <button
+              onClick={() => setMode("vendor")}
+              className={`flex-1 py-2.5 px-5 rounded-xl text-sm font-semibold transition-all ${
+                mode === "vendor"
+                  ? "bg-white text-slate-900 shadow-sm border border-slate-200"
+                  : "text-slate-500 hover:text-slate-700 hover:bg-white/60"
+              }`}
+            >
+              🔍 Vendor Analyzer
+            </button>
+            <button
+              onClick={() => setMode("county")}
+              className={`flex-1 py-2.5 px-5 rounded-xl text-sm font-semibold transition-all ${
+                mode === "county"
+                  ? "bg-white text-slate-900 shadow-sm border border-slate-200"
+                  : "text-slate-500 hover:text-slate-700 hover:bg-white/60"
+              }`}
+            >
+              🗺 County Education Data
+            </button>
+          </div>
+          <p className="text-center text-xs text-slate-400 mt-2.5">
+            {mode === "vendor"
+              ? "Analyze a specific edtech app's data flows, subprocessors, and ownership"
+              : "Map public education data infrastructure — SLDS, ECIDS, KEA, cross-sector linkages — by county"}
+          </p>
         </div>
 
         {/* Active mode */}
