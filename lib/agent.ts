@@ -304,8 +304,9 @@ ANTI-HALLUCINATION RULES — strictly enforced:
 - dataFlowNodes source "inferred": acceptable for downstream SIS/state nodes based on known industry patterns. Set url to null or an integration page if found. Never mark inferred as declared or detected.
 - NEVER invent acquisition years, prices, or acquirer names — only report what you verified from a source URL
 - lawsuits: ONLY include entries where you found and verified a real source URL (court filing, news article, FTC/AG press release). If you cannot find a verifiable source URL for a lawsuit, omit it. An empty array is correct when no verified lawsuit is found. Never invent case names, outcomes, or settlement amounts.
+- appMicroscope: ONLY copy the exact values returned by lookup_appmicroscope. If found is false, set found: false and leave riskTier: null, privacyRisks: [], searchSnippet: null. NEVER infer, guess, or fabricate a risk tier or privacy risks if the app was not found in the database.
 
-For vendorQuestions: 5-8 specific, pointed questions for a procurement officer based on actual gaps found — especially around AI/ML tool use, undisclosed third parties, and what happens to student data when a subprocessor uses it to train models.
+For vendorQuestions: 5-8 specific, pointed questions for a procurement officer based on actual gaps found — especially around AI/ML tool use, undisclosed third parties, and what happens to student data when a subprocessor uses it to train models. Base these ONLY on what you found in the vendor's own documents, detected trackers, and downstream integrations. Do NOT base any question on the App Microscope result.
 For humanInLoopSteps: 3-5 steps requiring human verification (dynamic traffic capture, DPA legal review, contractual audit rights, etc.).
 For citations: 10-20 entries — every major finding (subprocessor, integration, acquisition, tracker, AI tool, disclosure document) must cite a source URL you actually visited.
 

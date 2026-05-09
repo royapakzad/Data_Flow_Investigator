@@ -257,14 +257,14 @@ function AppMicroscopeCard({ data }: { data: AppMicroscopeData }) {
     return (
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 flex items-start gap-4">
         <div className="shrink-0 w-10 h-10 rounded-lg bg-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs">AM</div>
-        <div className="space-y-1">
-          <p className="font-semibold text-slate-700 text-sm">App Microscope — Not Found</p>
+        <div className="space-y-2">
+          <p className="font-semibold text-slate-700 text-sm">Not found in App Microscope database</p>
           <p className="text-xs text-slate-500 leading-relaxed">
-            This app is not in the Internet Safety Labs App Microscope database, which focuses on K-12 edtech apps manually tested as part of the 2022 EdTech Benchmark and related projects.
+            Check manually — this app may not have been tested yet, or may be listed under a different name.
           </p>
           <a href="https://appmicroscope.org/" target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline mt-1">
-            Search App Microscope ↗
+            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline">
+            Search App Microscope yourself ↗
           </a>
         </div>
       </div>
