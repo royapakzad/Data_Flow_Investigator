@@ -2,6 +2,7 @@ import { GoogleGenerativeAI, SchemaType, FunctionCallingMode, type FunctionDecla
 import { braveSearch } from "./brave-search";
 import { lookupExodus } from "./exodus";
 import { lookupAppStore } from "./appstore";
+import { lookupAppMicroscope } from "./appmicroscope";
 import { buildMermaidDiagram } from "./diagram";
 import type { VendorReport } from "./types";
 
@@ -92,6 +93,18 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
       required: ["appName"],
     },
   },
+  {
+    name: "lookup_appmicroscope",
+    description:
+      "Look up an app on App Microscope (appmicroscope.org) by Internet Safety Labs. Returns a safety label with risk tier (Critical Risk / High Risk / Medium Risk / Some Risk / Not Scored) and privacy risk categories. This is a curated database of manually-tested edtech and consumer apps.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        appName: { type: SchemaType.STRING, description: "App name to search for" },
+      },
+      required: ["appName"],
+    },
+  },
 ];
 
 const SYSTEM_PROMPT = `You are a data privacy investigator helping schools and districts evaluate edtech vendor data practices.
@@ -147,6 +160,9 @@ PART 7 — LAWSUITS & LEGAL ACTIONS (important for schools — helps identify pa
 32. Search "[vendor] settlement" and "[vendor] class action" and "[vendor] FERPA violation"
 33. If a parent company was found: search "[parent company] lawsuit student data" and "[parent company] privacy settlement"
 34. For any significant lawsuit or settlement found, fetch the source URL to verify details and outcome
+
+PART 8 — APP MICROSCOPE SAFETY LABEL (Internet Safety Labs curated database):
+35. Call lookup_appmicroscope with the app name — this checks Internet Safety Labs' App Microscope database (appmicroscope.org), which manually tests mobile apps for privacy risks. The result will include a risk tier (Critical Risk / High Risk / Medium Risk / Some Risk / Not Scored) and any privacy risk categories found. Include this in the appMicroscope field of the output. If not found (found: false), still include the field with found: false.
 
 After gathering data, output a JSON object matching this schema EXACTLY:
 
@@ -257,6 +273,14 @@ After gathering data, output a JSON object matching this schema EXACTLY:
     }
   ],
 
+  "appMicroscope": {
+    "found": boolean,
+    "pageUrl": string | null,
+    "riskTier": "Critical Risk" | "High Risk" | "Medium Risk" | "Some Risk" | "Not Scored" | null,
+    "privacyRisks": string[],
+    "searchSnippet": string | null
+  },
+
   "rawNotes": string
 }
 
@@ -327,6 +351,11 @@ async function executeTool(
       return JSON.stringify(result, null, 2);
     }
 
+    if (name === "lookup_appmicroscope") {
+      const result = await lookupAppMicroscope(input.appName as string);
+      return JSON.stringify(result, null, 2);
+    }
+
     return `Unknown tool: ${name}`;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -389,7 +418,8 @@ export async function runAgent(
         if (toolName === "search_web")      return `[${stepCount}] Searching: "${toolInput.query}"`;
         if (toolName === "fetch_page")      return `[${stepCount}] Fetching: ${toolInput.url}`;
         if (toolName === "lookup_exodus")   return `[${stepCount}] Checking Exodus Privacy for "${toolInput.appName}"`;
-        if (toolName === "lookup_appstore") return `[${stepCount}] Checking App Store for "${toolInput.appName}"`;
+        if (toolName === "lookup_appstore")      return `[${stepCount}] Checking App Store for "${toolInput.appName}"`;
+        if (toolName === "lookup_appmicroscope") return `[${stepCount}] Checking App Microscope for "${toolInput.appName}"`;
         return `[${stepCount}] Running ${toolName}`;
       })();
       onProgress(progressMsg);

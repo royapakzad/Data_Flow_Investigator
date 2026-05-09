@@ -112,6 +112,16 @@ export interface RedditPost {
   preview: string | null; // first ~200 chars of self-text, if available
 }
 
+// ── App Microscope (Internet Safety Labs) ────────────────────────────────────
+
+export interface AppMicroscopeData {
+  found: boolean;
+  pageUrl: string | null;
+  riskTier: string | null;    // "Critical Risk" | "High Risk" | "Medium Risk" | "Some Risk" | "Not Scored"
+  privacyRisks: string[];
+  searchSnippet: string | null;
+}
+
 // ── Main Report ───────────────────────────────────────────────────────────────
 
 export interface VendorReport {
@@ -145,6 +155,7 @@ export interface VendorReport {
   diagramCode?: string;   // built programmatically from dataFlowNodes
   sources?: Source[];
   rawNotes?: string;
+  appMicroscope?: AppMicroscopeData;
 }
 
 export interface AnalyzeRequest {
