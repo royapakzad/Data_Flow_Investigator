@@ -105,7 +105,7 @@ function MapSkeleton() {
 
 type AppMode = "vendor" | "county";
 
-const VENDOR_EXAMPLES = ["Teaching Strategies", "Kickboard", "ClassDojo", "Seesaw", "Canvas LMS"];
+const VENDOR_EXAMPLES = ["Teaching Strategies", "Kickboard", "ClassDojo", "Seesaw", "Canvas LMS", "iReady", "IXL"];
 
 // ── Vendor Analyzer tab ───────────────────────────────────────────────────────
 
