@@ -2,7 +2,6 @@ import { GoogleGenerativeAI, SchemaType, FunctionCallingMode, type FunctionDecla
 import { braveSearch } from "./brave-search";
 import { lookupExodus } from "./exodus";
 import { lookupAppStore } from "./appstore";
-import { lookupAppMicroscope } from "./appmicroscope";
 import { buildMermaidDiagram } from "./diagram";
 import type { VendorReport } from "./types";
 
@@ -93,18 +92,6 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
       required: ["appName"],
     },
   },
-  {
-    name: "lookup_appmicroscope",
-    description:
-      "Look up an app on App Microscope (appmicroscope.org) by Internet Safety Labs. Returns a safety label with risk tier (Critical Risk / High Risk / Medium Risk / Some Risk / Not Scored) and privacy risk categories. This is a curated database of manually-tested edtech and consumer apps.",
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        appName: { type: SchemaType.STRING, description: "App name to search for" },
-      },
-      required: ["appName"],
-    },
-  },
 ];
 
 const SYSTEM_PROMPT = `You are a data privacy investigator helping schools and districts evaluate edtech vendor data practices.
@@ -160,9 +147,6 @@ PART 7 — LAWSUITS & LEGAL ACTIONS (important for schools — helps identify pa
 32. Search "[vendor] settlement" and "[vendor] class action" and "[vendor] FERPA violation"
 33. If a parent company was found: search "[parent company] lawsuit student data" and "[parent company] privacy settlement"
 34. For any significant lawsuit or settlement found, fetch the source URL to verify details and outcome
-
-PART 8 — APP MICROSCOPE SAFETY LABEL (Internet Safety Labs curated database):
-35. Call lookup_appmicroscope with the app name — this checks Internet Safety Labs' App Microscope database (appmicroscope.org), which manually tests mobile apps for privacy risks. The result will include a risk tier (Critical Risk / High Risk / Medium Risk / Some Risk / Not Scored) and any privacy risk categories found. Include this in the appMicroscope field of the output. If not found (found: false), still include the field with found: false.
 
 After gathering data, output a JSON object matching this schema EXACTLY:
 
@@ -273,14 +257,6 @@ After gathering data, output a JSON object matching this schema EXACTLY:
     }
   ],
 
-  "appMicroscope": {
-    "found": boolean,
-    "pageUrl": string | null,
-    "riskTier": "Critical Risk" | "High Risk" | "Medium Risk" | "Some Risk" | "Not Scored" | null,
-    "privacyRisks": string[],
-    "searchSnippet": string | null
-  },
-
   "rawNotes": string
 }
 
@@ -304,9 +280,7 @@ ANTI-HALLUCINATION RULES — strictly enforced:
 - dataFlowNodes source "inferred": acceptable for downstream SIS/state nodes based on known industry patterns. Set url to null or an integration page if found. Never mark inferred as declared or detected.
 - NEVER invent acquisition years, prices, or acquirer names — only report what you verified from a source URL
 - lawsuits: ONLY include entries where you found and verified a real source URL (court filing, news article, FTC/AG press release). If you cannot find a verifiable source URL for a lawsuit, omit it. An empty array is correct when no verified lawsuit is found. Never invent case names, outcomes, or settlement amounts.
-- appMicroscope: ONLY copy the exact values returned by lookup_appmicroscope. If found is false, set found: false and leave riskTier: null, privacyRisks: [], searchSnippet: null. NEVER infer, guess, or fabricate a risk tier or privacy risks if the app was not found in the database.
-
-For vendorQuestions: 5-8 specific, pointed questions for a procurement officer based on actual gaps found — especially around AI/ML tool use, undisclosed third parties, and what happens to student data when a subprocessor uses it to train models. Base these ONLY on what you found in the vendor's own documents, detected trackers, and downstream integrations. Do NOT base any question on the App Microscope result.
+For vendorQuestions: 5-8 specific, pointed questions for a procurement officer based on actual gaps found — especially around AI/ML tool use, undisclosed third parties, and what happens to student data when a subprocessor uses it to train models. Base these ONLY on what you found in the vendor's own documents, detected trackers, and downstream integrations.
 For humanInLoopSteps: 3-5 steps requiring human verification (dynamic traffic capture, DPA legal review, contractual audit rights, etc.).
 For citations: 10-20 entries — every major finding (subprocessor, integration, acquisition, tracker, AI tool, disclosure document) must cite a source URL you actually visited.
 
@@ -349,11 +323,6 @@ async function executeTool(
 
     if (name === "lookup_appstore") {
       const result = await lookupAppStore(input.appName as string);
-      return JSON.stringify(result, null, 2);
-    }
-
-    if (name === "lookup_appmicroscope") {
-      const result = await lookupAppMicroscope(input.appName as string);
       return JSON.stringify(result, null, 2);
     }
 
@@ -420,7 +389,6 @@ export async function runAgent(
         if (toolName === "fetch_page")      return `[${stepCount}] Fetching: ${toolInput.url}`;
         if (toolName === "lookup_exodus")   return `[${stepCount}] Checking Exodus Privacy for "${toolInput.appName}"`;
         if (toolName === "lookup_appstore")      return `[${stepCount}] Checking App Store for "${toolInput.appName}"`;
-        if (toolName === "lookup_appmicroscope") return `[${stepCount}] Checking App Microscope for "${toolInput.appName}"`;
         return `[${stepCount}] Running ${toolName}`;
       })();
       onProgress(progressMsg);

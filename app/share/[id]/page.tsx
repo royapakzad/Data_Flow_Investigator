@@ -44,10 +44,10 @@ export default function SharePage({ params }: Props) {
       <main className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center space-y-4 max-w-md">
           <p className="text-5xl">🔗</p>
-          <h1 className="text-2xl font-bold text-white">Report not found</h1>
-          <p className="text-slate-400 text-sm leading-relaxed">
-            This shared report link has expired or is invalid. Shared reports are stored for 30 days
-            when Redis is configured, or until the server restarts otherwise.
+          <h1 className="text-2xl font-bold text-slate-900">Report not found</h1>
+          <p className="text-slate-500 text-sm leading-relaxed">
+            This shared report link has expired or the server was restarted. Shared reports persist
+            for 30 days when Redis is configured, or across warm server restarts otherwise.
           </p>
           <Link href="/"
             className="inline-block px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium text-sm hover:bg-blue-500 transition-colors">
@@ -62,9 +62,9 @@ export default function SharePage({ params }: Props) {
     return (
       <main className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center space-y-4">
-          <h1 className="text-xl font-bold text-red-300">Failed to load report</h1>
+          <h1 className="text-xl font-bold text-red-700">Failed to load report</h1>
           <button onClick={() => { setState("loading"); window.location.reload(); }}
-            className="px-4 py-2 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm hover:bg-red-500/30 transition-colors">
+            className="px-4 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm hover:bg-red-100 transition-colors">
             Retry
           </button>
         </div>
@@ -84,13 +84,13 @@ export default function SharePage({ params }: Props) {
       <div className="max-w-5xl mx-auto space-y-8">
 
         {/* Shared report banner */}
-        <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-slate-800/60 border border-slate-700 no-print flex-wrap">
+        <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-white border border-slate-200 shadow-sm no-print flex-wrap">
           <div className="space-y-0.5">
-            <p className="text-sm font-medium text-slate-300">
+            <p className="text-sm font-medium text-slate-700">
               Shared Report —{" "}
               {shared.type === "vendor" ? "Vendor Analysis" : "County Education Data"}
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-400">
               Generated{" "}
               {new Date(shared.createdAt).toLocaleDateString("en-US", {
                 year: "numeric", month: "long", day: "numeric",
@@ -103,7 +103,7 @@ export default function SharePage({ params }: Props) {
             <CopyLinkButton path={`/share/${params.id}`} />
             <PrintButton />
             <Link href="/"
-              className="px-4 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-300 text-sm hover:bg-slate-600 transition-colors">
+              className="px-4 py-2 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 text-sm hover:bg-slate-200 transition-colors">
               Analyze your own →
             </Link>
           </div>
@@ -111,8 +111,8 @@ export default function SharePage({ params }: Props) {
 
         {/* Print-only header */}
         <div className="hidden print-only space-y-1">
-          <h1 className="text-2xl font-bold text-white">{title}</h1>
-          <p className="text-slate-400 text-sm">
+          <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
+          <p className="text-slate-500 text-sm">
             Education Data Investigator · Shared report ·{" "}
             {new Date(shared.createdAt).toLocaleDateString("en-US", {
               year: "numeric", month: "long", day: "numeric",
