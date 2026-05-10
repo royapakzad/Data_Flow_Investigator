@@ -6,7 +6,6 @@ import { DataFlowDiagram } from "./DataFlowDiagram";
 import { DiscrepancyList } from "./DiscrepancyList";
 import { SubprocessorTable } from "./SubprocessorTable";
 import { CompanyHistory } from "./CompanyHistory";
-import { SafetyLabelCard } from "./SafetyLabelCard";
 
 interface Props {
   report: VendorReport;
@@ -312,16 +311,6 @@ export function AnalysisReport({ report }: Props) {
           Check {report.vendorName} on App Microscope ↗
         </a>
       </Section>
-
-      {/* ── Safety Label Card ──────────────────────────────────────────── */}
-      {report.dataFlowNodes?.length > 0 && (
-        <Section
-          title="Education Data Safety Label"
-          subtitle="A printable card showing where this app sits in the education data ecosystem — from classroom to cross-sector linkages. Download as PDF to share with your privacy officer or school board."
-        >
-          <SafetyLabelCard report={report} />
-        </Section>
-      )}
 
       {/* ── Source Documents ───────────────────────────────────────────── */}
       {(docs.privacyPolicyUrl || docs.dpaUrl || docs.subprocessorListUrl || docs.appStoreUrl || docs.playStoreUrl) && (
