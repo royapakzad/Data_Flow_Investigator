@@ -113,6 +113,7 @@ const MAX_AUTO_RETRIES = 2;
 
 function VendorAnalyzer() {
   const [vendorName, setVendorName] = useState("");
+  const [districtName, setDistrictName] = useState("");
   const [loading, setLoading] = useState(false);
   const [progressLog, setProgressLog] = useState<string[]>([]);
   const [report, setReport] = useState<VendorReport | null>(null);
@@ -127,7 +128,7 @@ function VendorAnalyzer() {
     setLoading(false);
   }
 
-  async function analyze(name: string, attemptNum = 1) {
+  async function analyze(name: string, district: string, attemptNum = 1) {
     if (!name.trim()) return;
     cancelledRef.current = false;
     setLoading(true);
@@ -138,10 +139,12 @@ function VendorAnalyzer() {
     if (pollRef.current) clearInterval(pollRef.current);
 
     try {
+      const body: Record<string, string> = { vendorName: name.trim() };
+      if (district.trim()) body.districtName = district.trim();
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vendorName: name.trim() }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? `Server error ${res.status}`);
@@ -177,7 +180,7 @@ function VendorAnalyzer() {
           const msg = pollErr instanceof Error ? pollErr.message : "Unknown error";
           if (!cancelledRef.current && attemptNum <= MAX_AUTO_RETRIES) {
             setProgressLog((prev) => [...prev, `Retrying (attempt ${attemptNum + 1})…`]);
-            await analyze(name, attemptNum + 1);
+            await analyze(name, district, attemptNum + 1);
           } else {
             setError(msg);
             setLoading(false);
@@ -190,7 +193,7 @@ function VendorAnalyzer() {
       if (attemptNum <= MAX_AUTO_RETRIES) {
         setProgressLog((prev) => [...prev, `Network error — retrying (attempt ${attemptNum + 1})…`]);
         await new Promise((r) => setTimeout(r, 2000 * attemptNum));
-        return analyze(name, attemptNum + 1);
+        return analyze(name, district, attemptNum + 1);
       }
       setError(msg);
       setLoading(false);
@@ -204,7 +207,7 @@ function VendorAnalyzer() {
         detected trackers, company ownership, and known legal actions.
       </p>
 
-      <form onSubmit={(e) => { e.preventDefault(); analyze(vendorName); }} className="space-y-3 no-print">
+      <form onSubmit={(e) => { e.preventDefault(); analyze(vendorName, districtName); }} className="space-y-3 no-print">
         <div className="flex gap-3">
           <input
             type="text"
@@ -219,10 +222,18 @@ function VendorAnalyzer() {
             Analyze
           </button>
         </div>
+        <input
+          type="text"
+          value={districtName}
+          onChange={(e) => setDistrictName(e.target.value)}
+          placeholder="School district (optional) — e.g. Austin ISD, Los Angeles Unified"
+          disabled={loading}
+          className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 placeholder-slate-400 text-sm focus:outline-none focus:border-blue-400 disabled:opacity-50 transition-colors"
+        />
         <div className="flex gap-2 flex-wrap">
           {VENDOR_EXAMPLES.map((ex) => (
             <button key={ex} type="button" disabled={loading}
-              onClick={() => { setVendorName(ex); analyze(ex); }}
+              onClick={() => { setVendorName(ex); analyze(ex, districtName); }}
               className="px-3 py-1 rounded-lg bg-white border border-slate-300 text-slate-600 text-sm hover:border-slate-400 hover:text-slate-800 disabled:opacity-40 transition-colors">
               {ex}
             </button>
@@ -243,7 +254,7 @@ function VendorAnalyzer() {
           <p className="text-red-700">
             <strong>Error after {attempt} attempt{attempt > 1 ? "s" : ""}:</strong> {error}
           </p>
-          <button onClick={() => analyze(vendorName)}
+          <button onClick={() => analyze(vendorName, districtName)}
             className="px-4 py-2 rounded-lg bg-red-100 border border-red-200 text-red-700 text-sm hover:bg-red-200 transition-colors">
             Try again
           </button>

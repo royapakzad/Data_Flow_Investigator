@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import type { VendorReport, Citation, Lawsuit } from "@/lib/types";
+import type { VendorReport, Citation, Lawsuit, AppMicroscopeData } from "@/lib/types";
 import { DataFlowDiagram } from "./DataFlowDiagram";
 import { DiscrepancyList } from "./DiscrepancyList";
 import { SubprocessorTable } from "./SubprocessorTable";
 import { CompanyHistory } from "./CompanyHistory";
+import { OwnershipGraph } from "./OwnershipGraph";
 
 interface Props {
   report: VendorReport;
@@ -243,6 +244,76 @@ function LawsuitsList({ lawsuits }: { lawsuits: Lawsuit[] }) {
   );
 }
 
+// ── App Microscope safety label card ─────────────────────────────────────────
+const AM_TIER_STYLES: Record<string, string> = {
+  "Critical Risk": "bg-red-100 border-red-300 text-red-800",
+  "High Risk":     "bg-orange-100 border-orange-300 text-orange-800",
+  "Medium Risk":   "bg-yellow-100 border-yellow-300 text-yellow-800",
+  "Some Risk":     "bg-blue-50 border-blue-300 text-blue-800",
+  "Not Scored":    "bg-slate-100 border-slate-300 text-slate-600",
+};
+
+function AppMicroscopeCard({ data }: { data: AppMicroscopeData }) {
+  if (!data.found) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 flex items-start gap-4">
+        <div className="shrink-0 w-10 h-10 rounded-lg bg-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs">AM</div>
+        <div className="space-y-2">
+          <p className="font-semibold text-slate-700 text-sm">Not found in App Microscope database</p>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Check manually — this app may not have been tested yet, or may be listed under a different name.
+          </p>
+          <a href="https://appmicroscope.org/" target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline">
+            Search App Microscope yourself ↗
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  const tierStyle = data.riskTier ? (AM_TIER_STYLES[data.riskTier] ?? AM_TIER_STYLES["Not Scored"]) : AM_TIER_STYLES["Not Scored"];
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="p-5 flex items-start gap-4">
+        <div className="shrink-0 w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs">AM</div>
+        <div className="flex-1 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="font-semibold text-slate-800 text-sm">App Microscope Safety Label</p>
+              <p className="text-xs text-slate-500">Internet Safety Labs — manually tested</p>
+            </div>
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${tierStyle}`}>
+              {data.riskTier ?? "Not Scored"}
+            </span>
+          </div>
+          {data.privacyRisks.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {data.privacyRisks.map((risk, i) => (
+                <span key={i} className="px-2 py-0.5 rounded-full text-xs bg-red-50 border border-red-200 text-red-700">
+                  {risk}
+                </span>
+              ))}
+            </div>
+          )}
+          {data.searchSnippet && (
+            <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 rounded-lg p-3 border border-slate-100">
+              {data.searchSnippet}
+            </p>
+          )}
+          {data.pageUrl && (
+            <a href={data.pageUrl} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline">
+              View on App Microscope ↗
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Risk badge ────────────────────────────────────────────────────────────────
 const RISK_STYLES = {
   elevated:      "bg-red-100 text-red-700 border-red-300",
@@ -281,9 +352,12 @@ export function AnalysisReport({ report }: Props) {
 
       {/* ── Company Ownership ──────────────────────────────────────────── */}
       {report.companyOwnership && (
-        <Section title="Company Ownership & Acquisition History"
-          subtitle="Who ultimately controls this product and its data.">
-          <CompanyHistory ownership={report.companyOwnership} />
+        <Section title="Company Ownership & Acquisition Network"
+          subtitle="Who ultimately controls this product and its data — traced up to private equity firms, with their full portfolio.">
+          <OwnershipGraph vendorName={report.vendorName} ownership={report.companyOwnership} />
+          <div className="mt-6">
+            <CompanyHistory ownership={report.companyOwnership} />
+          </div>
         </Section>
       )}
 
@@ -299,17 +373,16 @@ export function AnalysisReport({ report }: Props) {
         )}
       </Section>
 
-      {/* ── App Microscope link ────────────────────────────────────────── */}
-      <Section title="App Microscope — Internet Safety Labs"
-        subtitle="Internet Safety Labs manually tests mobile apps for privacy risks. Check this app in their independent database.">
-        <a
-          href="https://appmicroscope.org/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-white border border-slate-200 shadow-sm text-sm font-medium text-blue-700 hover:border-blue-300 hover:bg-blue-50 hover:shadow transition-all"
-        >
-          Check {report.vendorName} on App Microscope ↗
-        </a>
+      {/* ── App Microscope ─────────────────────────────────────────────── */}
+      <Section title="App Microscope Safety Label"
+        subtitle="Internet Safety Labs manually tests mobile apps for privacy risks. This label reflects their independent assessment — separate from what the vendor self-discloses.">
+        {report.appMicroscope ? (
+          <AppMicroscopeCard data={report.appMicroscope} />
+        ) : (
+          <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 text-slate-500 text-sm">
+            App Microscope was not checked during this analysis. Re-run to include it.
+          </div>
+        )}
       </Section>
 
       {/* ── Source Documents ───────────────────────────────────────────── */}

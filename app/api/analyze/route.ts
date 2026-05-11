@@ -7,11 +7,13 @@ export const maxDuration = 300;
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
-  const { vendorName } = body;
+  const { vendorName, districtName } = body;
 
   if (!vendorName || typeof vendorName !== "string") {
     return Response.json({ error: "vendorName required" }, { status: 400 });
   }
+
+  const district = typeof districtName === "string" && districtName.trim() ? districtName.trim() : undefined;
 
   // ── Mode A: Redis configured → background job, return ID for polling ────────
   if (isRedisConfigured) {
@@ -28,7 +30,7 @@ export async function POST(req: Request) {
             progress.push(msg);
             // Write progress to Redis on each step so polling picks it up immediately
             updateJob(id, { progress: [...progress] }).catch(() => {});
-          });
+          }, district);
           await updateJob(id, { status: "done", report, progress });
         } catch (err) {
           await updateJob(id, {
@@ -47,7 +49,7 @@ export async function POST(req: Request) {
   // The client checks for `status` in the response and skips polling.
   const progress: string[] = [];
   try {
-    const report = await runAgent(vendorName, (msg) => { progress.push(msg); });
+    const report = await runAgent(vendorName, (msg) => { progress.push(msg); }, district);
     return Response.json({ status: "done", report, progress });
   } catch (err) {
     return Response.json(

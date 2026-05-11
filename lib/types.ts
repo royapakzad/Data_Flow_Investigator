@@ -74,14 +74,32 @@ export interface AcquisitionEvent {
   sourceLabel: string;    // e.g. "TechCrunch", "SEC EDGAR", "Company Blog"
 }
 
+export interface PortfolioCompany {
+  name: string;
+  url: string | null;
+  description: string | null;
+}
+
+export interface VendorAcquisition {
+  name: string;
+  url: string | null;
+  year: number | null;
+  description: string;
+  sourceUrl: string | null;
+  sourceLabel: string | null;
+}
+
 export interface CompanyOwnership {
   currentParentCompany: string | null;
   currentParentUrl: string | null;    // homepage or Wikipedia URL of parent company
   currentParentDescription: string | null;
   foundedYear: number | null;
   founders: string[];
-  acquisitionHistory: AcquisitionEvent[]; // empty array if none found — never invent
+  acquisitionHistory: AcquisitionEvent[]; // acquisitions OF the vendor (who bought it) — never invent
   ownershipNotes: string;               // any additional verified context
+  isPEOwned: boolean;                   // is the ultimate parent a private equity / financial firm?
+  pePortfolioCompanies: PortfolioCompany[]; // other companies owned by the same PE firm (if applicable)
+  vendorAcquisitions: VendorAcquisition[];  // companies the vendor itself has acquired
 }
 
 // ── Lawsuits & Legal Actions ──────────────────────────────────────────────────
@@ -161,6 +179,7 @@ export interface VendorReport {
 export interface AnalyzeRequest {
   vendorName: string;
   appStoreUrl?: string;
+  districtName?: string;
 }
 
 // ── County Education Data System Types ────────────────────────────────────────
