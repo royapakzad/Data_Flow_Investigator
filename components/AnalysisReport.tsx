@@ -6,7 +6,6 @@ import { DataFlowDiagram } from "./DataFlowDiagram";
 import { DiscrepancyList } from "./DiscrepancyList";
 import { SubprocessorTable } from "./SubprocessorTable";
 import { CompanyHistory } from "./CompanyHistory";
-import { OwnershipGraph } from "./OwnershipGraph";
 
 interface Props {
   report: VendorReport;
@@ -352,12 +351,9 @@ export function AnalysisReport({ report }: Props) {
 
       {/* ── Company Ownership ──────────────────────────────────────────── */}
       {report.companyOwnership && (
-        <Section title="Company Ownership & Acquisition Network"
-          subtitle="Who ultimately controls this product and its data — traced up to private equity firms, with their full portfolio.">
-          <OwnershipGraph vendorName={report.vendorName} ownership={report.companyOwnership} />
-          <div className="mt-6">
-            <CompanyHistory ownership={report.companyOwnership} />
-          </div>
+        <Section title="Company Ownership & Acquisition History"
+          subtitle="Who ultimately controls this product and its data.">
+          <CompanyHistory ownership={report.companyOwnership} />
         </Section>
       )}
 

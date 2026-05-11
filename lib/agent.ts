@@ -135,15 +135,12 @@ PART 5 — DOWNSTREAM RESEARCH (critical — most tools skip this):
 24. Search "[vendor] state education data FERPA" — state/federal data system connections
 25. Fetch any integration/partners page you find
 
-PART 6 — COMPANY OWNERSHIP & ACQUISITION NETWORK (always do this — schools must know who really owns the data):
+PART 6 — COMPANY OWNERSHIP RESEARCH (always do this — schools must know who really owns the data):
 26. Search "[vendor] parent company" and "[vendor] acquired by" and "[vendor] acquisition"
 27. Search "[vendor] Wikipedia" — fetch the Wikipedia page if found (has acquisition history)
 28. Search "[vendor] founded year founder CEO" — for founding context
 29. For any acquisition found, search "[acquirer] acquires [vendor] [year]" to find the original news article or press release
 30. If a major acquisition is found, fetch the original announcement URL to verify details
-31. Determine if the ultimate parent is a private equity or investment firm: search "[parent company] private equity" and "[parent company] investment fund" and "[parent company] portfolio"
-32. If PE-owned: fetch the PE firm's portfolio page to find other edtech/education companies they own — list them all (name + URL + one-line description)
-33. Search "[vendor] acquired [company]" and "[vendor] acquires" and "[vendor] acquisition strategy" — to find companies the VENDOR ITSELF has bought (its subsidiaries/portfolio)
 
 PART 7 — LAWSUITS & LEGAL ACTIONS (important for schools — helps identify past privacy violations):
 31. Search "[vendor] lawsuit" and "[vendor] legal action" and "[vendor] FTC complaint" and "[vendor] privacy lawsuit"
@@ -209,7 +206,7 @@ After gathering data, output a JSON object matching this schema EXACTLY:
     "currentParentDescription": string | null,
     "foundedYear": number | null,
     "founders": string[],
-    "acquisitionHistory": [  // acquisitions OF the vendor (who bought it) — never invent
+    "acquisitionHistory": [
       {
         "year": number,
         "acquirer": string,
@@ -220,24 +217,9 @@ After gathering data, output a JSON object matching this schema EXACTLY:
       }
     ],
     "ownershipNotes": string,
-    "isPEOwned": boolean,    // true if the ultimate parent is a private equity / financial firm
-    "pePortfolioCompanies": [  // other companies owned by the same PE firm — only if isPEOwned: true
-      {
-        "name": string,
-        "url": string | null,
-        "description": string | null
-      }
-    ],
-    "vendorAcquisitions": [  // companies the VENDOR ITSELF has acquired — never invent
-      {
-        "name": string,
-        "url": string | null,
-        "year": number | null,
-        "description": string,
-        "sourceUrl": string | null,
-        "sourceLabel": string | null
-      }
-    ]
+    "isPEOwned": false,
+    "pePortfolioCompanies": [],
+    "vendorAcquisitions": []
   },
 
   "lawsuits": [
@@ -302,9 +284,6 @@ ANTI-HALLUCINATION RULES — strictly enforced:
 - NEVER invent acquisition years, prices, or acquirer names — only report what you verified from a source URL
 - lawsuits: ONLY include entries where you found and verified a real source URL (court filing, news article, FTC/AG press release). If you cannot find a verifiable source URL for a lawsuit, omit it. An empty array is correct when no verified lawsuit is found. Never invent case names, outcomes, or settlement amounts.
 - appMicroscope: ONLY copy the exact values returned by lookup_appmicroscope. If found is false, set found: false and leave riskTier: null, privacyRisks: [], searchSnippet: null. NEVER infer, guess, or fabricate a risk tier or privacy risks.
-- isPEOwned: set true ONLY if you verified the parent is a PE/investment firm from a reliable source. Default false.
-- pePortfolioCompanies: ONLY include companies you actually found listed on the PE firm's portfolio page or in verified news. Empty array when not found or not PE-owned.
-- vendorAcquisitions: ONLY include companies the vendor provably acquired with a real source URL. Empty array when none found.
 
 For vendorQuestions: 5-8 specific, pointed questions for a procurement officer based on actual gaps found — especially around AI/ML tool use, undisclosed third parties, and what happens to student data when a subprocessor uses it to train models. Base these ONLY on what you found in the vendor's own documents, detected trackers, and downstream integrations. Do NOT base any question on the App Microscope result.
 For humanInLoopSteps: 3-5 steps requiring human verification (dynamic traffic capture, DPA legal review, contractual audit rights, etc.).
