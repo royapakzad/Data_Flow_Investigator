@@ -2,11 +2,12 @@
 
 import { useState, useRef } from "react";
 import dynamic from "next/dynamic";
-import type { VendorReport, CountyReport } from "@/lib/types";
+import type { VendorReport, CountyReport, CompanyOwnership } from "@/lib/types";
 import type { CountyInfo } from "@/components/USCountyMap";
 import { AnalysisReport } from "@/components/AnalysisReport";
 import { CountyReport as CountyReportView } from "@/components/CountyReport";
 import { ReportActions } from "@/components/ReportActions";
+import { OwnershipGraph } from "@/components/OwnershipGraph";
 
 // ── Progress panel ────────────────────────────────────────────────────────────
 
@@ -103,7 +104,7 @@ function MapSkeleton() {
   );
 }
 
-type AppMode = "vendor" | "county";
+type AppMode = "vendor" | "county" | "ownership";
 
 const VENDOR_EXAMPLES = ["Teaching Strategies", "Kickboard", "ClassDojo", "Seesaw", "Canvas LMS", "iReady", "IXL"];
 
@@ -191,7 +192,7 @@ function VendorAnalyzer() {
       if (cancelledRef.current) return;
       const msg = err instanceof Error ? err.message : "Unknown error";
       if (attemptNum <= MAX_AUTO_RETRIES) {
-        setProgressLog((prev) => [...prev, `Network error — retrying (attempt ${attemptNum + 1})…`]);
+        setProgressLog((prev) => [...prev, `Network error, retrying (attempt ${attemptNum + 1})…`]);
         await new Promise((r) => setTimeout(r, 2000 * attemptNum));
         return analyze(name, district, attemptNum + 1);
       }
@@ -226,7 +227,7 @@ function VendorAnalyzer() {
           type="text"
           value={districtName}
           onChange={(e) => setDistrictName(e.target.value)}
-          placeholder="School district (optional) — e.g. Austin ISD, Los Angeles Unified"
+          placeholder="School district (optional), e.g. Austin ISD, Los Angeles Unified"
           disabled={loading}
           className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 placeholder-slate-400 text-sm focus:outline-none focus:border-blue-400 disabled:opacity-50 transition-colors"
         />
@@ -272,6 +273,153 @@ function VendorAnalyzer() {
         <p className="text-center text-xs text-slate-600 max-w-xl mx-auto">
           Automated analysis of public disclosures. Does not perform dynamic traffic interception or
           legal interpretation of data processing agreements. Verify findings before procurement decisions.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Ownership Network tab ─────────────────────────────────────────────────────
+
+const OWNERSHIP_EXAMPLES = ["IXL Learning", "PowerSchool", "Frontline Education", "Renaissance Learning", "ClassDojo"];
+
+function OwnershipExplorer() {
+  const [companyName, setCompanyName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [progressLog, setProgressLog] = useState<string[]>([]);
+  const [result, setResult] = useState<{ companyName: string; ownership: CompanyOwnership } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const cancelledRef = useRef(false);
+
+  async function search(name: string) {
+    if (!name.trim()) return;
+    cancelledRef.current = false;
+    setLoading(true);
+    setResult(null);
+    setError(null);
+    setProgressLog([]);
+
+    try {
+      const res = await fetch("/api/ownership", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyName: name.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (cancelledRef.current) return;
+      if (!res.ok || data.status === "error") throw new Error(data.error ?? `Server error ${res.status}`);
+      if (data.progress?.length) setProgressLog(data.progress);
+      setResult({ companyName: data.companyName, ownership: data.ownership });
+    } catch (err) {
+      if (cancelledRef.current) return;
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      if (!cancelledRef.current) setLoading(false);
+    }
+  }
+
+  // Extract step number from "[N] ..." messages for progress bar
+  const lastNumbered = [...progressLog].reverse().find(m => m.match(/^\[(\d+)\]/));
+  const current = lastNumbered ? parseInt(lastNumbered.match(/^\[(\d+)\]/)![1]) : 0;
+  const pct = Math.min(95, Math.round((current / 16) * 100));
+  const currentLabel = (progressLog[progressLog.length - 1] ?? "Initializing…").replace(/^\[\d+\]\s*/, "");
+
+  return (
+    <div className="space-y-6">
+      <p className="text-slate-600 max-w-2xl text-base leading-relaxed no-print">
+        Enter any edtech company to trace its full ownership chain, up through every acquirer to
+        the private equity firm (if applicable), with their complete portfolio of other companies.
+      </p>
+
+      <form onSubmit={(e) => { e.preventDefault(); search(companyName); }} className="space-y-3 no-print">
+        <div className="flex gap-3">
+          <input
+            type="text"
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            placeholder="e.g. IXL Learning, PowerSchool, ClassDojo…"
+            disabled={loading}
+            className="flex-1 px-4 py-3 rounded-xl bg-white border border-slate-300 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 disabled:opacity-50 transition-colors"
+          />
+          <button type="submit" disabled={loading || !companyName.trim()}
+            className="px-6 py-3 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            Trace
+          </button>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {OWNERSHIP_EXAMPLES.map((ex) => (
+            <button key={ex} type="button" disabled={loading}
+              onClick={() => { setCompanyName(ex); search(ex); }}
+              className="px-3 py-1 rounded-lg bg-white border border-slate-300 text-slate-600 text-sm hover:border-slate-400 hover:text-slate-800 disabled:opacity-40 transition-colors">
+              {ex}
+            </button>
+          ))}
+        </div>
+      </form>
+
+      {loading && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm no-print">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin shrink-0" />
+              <span className="text-slate-800 text-sm font-semibold">Tracing ownership chain…</span>
+            </div>
+            <button onClick={() => { cancelledRef.current = true; setLoading(false); }}
+              className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-200">
+              Cancel
+            </button>
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+              <span>Step {current} of ~16</span>
+              <span>{pct}%</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
+              <div className="h-full rounded-full bg-blue-500 transition-all duration-700" style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+          <p className="text-slate-700 text-sm font-mono break-all">{currentLabel}</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm space-y-3 no-print">
+          <p className="text-red-700"><strong>Error:</strong> {error}</p>
+          <button onClick={() => search(companyName)}
+            className="px-4 py-2 rounded-lg bg-red-100 border border-red-200 text-red-700 text-sm hover:bg-red-200 transition-colors">
+            Try again
+          </button>
+        </div>
+      )}
+
+      {result && (
+        <div className="space-y-4 border-t border-slate-200 pt-8">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">{result.companyName}</h2>
+            {result.ownership.currentParentCompany && (
+              <p className="text-sm text-slate-500 mt-1">
+                Ultimate parent: {result.ownership.currentParentUrl ? (
+                  <a href={result.ownership.currentParentUrl} target="_blank" rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline font-medium">
+                    {result.ownership.currentParentCompany} ↗
+                  </a>
+                ) : (
+                  <span className="font-medium text-slate-700">{result.ownership.currentParentCompany}</span>
+                )}
+                {result.ownership.isPEOwned && (
+                  <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">PE-owned</span>
+                )}
+              </p>
+            )}
+          </div>
+          <OwnershipGraph vendorName={result.companyName} ownership={result.ownership} />
+        </div>
+      )}
+
+      {!loading && !result && !error && (
+        <p className="text-center text-xs text-slate-600 max-w-xl mx-auto">
+          Traces corporate ownership using public sources: news, Wikipedia, PE firm portfolio pages, and press releases.
+          Verify findings independently before use in procurement or advocacy decisions.
         </p>
       )}
     </div>
@@ -338,7 +486,7 @@ function CountyExplorer() {
     setSearchError(null);
     const county = parseCountySearch(searchInput);
     if (!county) {
-      setSearchError('Enter "County Name, State" — e.g. Travis County, TX');
+      setSearchError('Enter "County Name, State", e.g. Travis County, TX');
       return;
     }
     setSearchInput("");
@@ -411,7 +559,7 @@ function CountyExplorer() {
       if (cancelledRef.current) return;
       const msg = err instanceof Error ? err.message : "Unknown error";
       if (attemptNum <= MAX_AUTO_RETRIES) {
-        setProgressLog((prev) => [...prev, `Network error — retrying (attempt ${attemptNum + 1})…`]);
+        setProgressLog((prev) => [...prev, `Network error, retrying (attempt ${attemptNum + 1})…`]);
         await new Promise((r) => setTimeout(r, 2000 * attemptNum));
         return investigateCounty(county, attemptNum + 1);
       }
@@ -423,7 +571,7 @@ function CountyExplorer() {
   return (
     <div className="space-y-6">
       <p className="text-slate-600 max-w-2xl text-base leading-relaxed no-print">
-        Click any county on the map — or type a county name below — to investigate its public
+        Click any county on the map or type a county name below to investigate its public
         education data integration ecosystem from preschool through K-12.
       </p>
 
@@ -493,7 +641,7 @@ function CountyExplorer() {
       {!loading && !selectedCounty && (
         <p className="text-center text-xs text-slate-600 max-w-2xl mx-auto">
           Research is based on publicly available government sources and official state documentation.
-          County-level specifics may be limited — most education data systems are administered at the
+          County-level specifics may be limited; most education data systems are administered at the
           state level. Findings should be verified with your state Department of Education.
         </p>
       )}
@@ -513,22 +661,22 @@ export default function Home() {
         {/* Hero */}
         <div className="text-center space-y-5 no-print">
           <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-sm font-semibold tracking-wide">
-            AI-powered · For schools, districts, and advocates
+            For schools, districts, and advocates
           </span>
           <h1 className="text-5xl font-bold text-slate-900 tracking-tight">
             Education Data Investigator
           </h1>
           <p className="text-slate-500 max-w-xl mx-auto text-lg leading-relaxed">
-            Understand how student data moves through the education system — and who controls it.
+            Understand how student data moves through the education system and who controls it.
           </p>
         </div>
 
         {/* Mode tabs */}
         <div className="no-print">
-          <div className="flex gap-1 p-1.5 rounded-2xl bg-slate-100 border border-slate-200 max-w-lg mx-auto shadow-sm">
+          <div className="flex gap-1 p-1.5 rounded-2xl bg-slate-100 border border-slate-200 max-w-2xl mx-auto shadow-sm">
             <button
               onClick={() => setMode("vendor")}
-              className={`flex-1 py-3 px-5 rounded-xl text-base font-semibold transition-all ${
+              className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all ${
                 mode === "vendor"
                   ? "bg-white text-slate-900 shadow-sm border border-slate-200"
                   : "text-slate-500 hover:text-slate-700 hover:bg-white/60"
@@ -537,27 +685,38 @@ export default function Home() {
               🔍 Vendor Analyzer
             </button>
             <button
+              onClick={() => setMode("ownership")}
+              className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all ${
+                mode === "ownership"
+                  ? "bg-white text-slate-900 shadow-sm border border-slate-200"
+                  : "text-slate-500 hover:text-slate-700 hover:bg-white/60"
+              }`}
+            >
+              🏢 Ownership Network
+            </button>
+            <button
               onClick={() => setMode("county")}
-              className={`flex-1 py-3 px-5 rounded-xl text-base font-semibold transition-all ${
+              className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold transition-all ${
                 mode === "county"
                   ? "bg-white text-slate-900 shadow-sm border border-slate-200"
                   : "text-slate-500 hover:text-slate-700 hover:bg-white/60"
               }`}
             >
-              🗺 County Education Data
+              🗺 County Data
             </button>
           </div>
           <p className="text-center text-sm text-slate-400 mt-3">
-            {mode === "vendor"
-              ? "Analyze a specific edtech app's data flows, subprocessors, and ownership"
-              : "Map public education data infrastructure — SLDS, ECIDS, KEA, cross-sector linkages — by county"}
+            {mode === "vendor"   && "Analyze a specific edtech app's data flows, subprocessors, and ownership"}
+            {mode === "ownership" && "Trace any edtech company's acquisition chain up to private equity, with full PE portfolio"}
+            {mode === "county"   && "Map public education data infrastructure (SLDS, ECIDS, KEA, cross-sector linkages) by county"}
           </p>
         </div>
 
         {/* Active mode */}
         <div>
-          {mode === "vendor" && <VendorAnalyzer />}
-          {mode === "county" && <CountyExplorer />}
+          {mode === "vendor"    && <VendorAnalyzer />}
+          {mode === "ownership" && <OwnershipExplorer />}
+          {mode === "county"    && <CountyExplorer />}
         </div>
 
       </div>
