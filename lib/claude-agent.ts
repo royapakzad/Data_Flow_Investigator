@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { tavilySearch, type SearchResult } from "./tavily-search";
+import { extractPages, type PageText } from "./extract";
 
 const client = new Anthropic(); // reads ANTHROPIC_API_KEY
 
@@ -22,15 +23,25 @@ export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) =>
   return out;
 }
 
-// Fetch a page and strip it to plain text.
-export async function fetchPageText(url: string, maxChars: number, userAgent: string): Promise<string> {
-  const res = await fetch(url, {
-    headers: { "User-Agent": userAgent },
-    signal: AbortSignal.timeout(15000),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const text = await res.text();
-  return text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, maxChars);
+// Read pages in bulk (Tavily Extract with a local fallback), reporting progress.
+export async function readPages(urls: string[], maxChars: number, onProgress: (msg: string) => void): Promise<PageText[]> {
+  if (!urls.length) return [];
+  onProgress(`Fetching: reading ${urls.length} pages…`);
+  const pages = await extractPages(urls, maxChars);
+  const ok = pages.filter((p) => p.text).length;
+  onProgress(`Fetching: read ${ok} of ${urls.length} pages`);
+  return pages;
+}
+
+// Fail fast with a clear message instead of producing an empty report.
+export function assertKeys() {
+  const missing = ["ANTHROPIC_API_KEY", "TAVILY_API_KEY"].filter((k) => !process.env[k]);
+  if (missing.length) throw new Error(`Missing ${missing.join(" and ")}. Add ${missing.length > 1 ? "them" : "it"} to .env.local and restart the server.`);
+}
+
+export interface SearchQuery {
+  query: string;
+  topic?: "general" | "news";
 }
 
 export interface SearchBatchResult {
@@ -41,18 +52,20 @@ export interface SearchBatchResult {
 
 // Run a fixed list of searches in parallel; failures are recorded, not thrown.
 export async function runSearches(
-  queries: string[],
+  queries: (string | SearchQuery)[],
   onProgress: (msg: string) => void,
 ): Promise<SearchBatchResult[]> {
   onProgress(`Running ${queries.length} searches in parallel…`);
-  const out = await mapLimit(queries, 8, async (query) => {
+  const out = await mapLimit(queries, 8, async (item) => {
+    const { query, topic } = typeof item === "string" ? { query: item, topic: undefined } : item;
     try {
-      return { query, results: await tavilySearch(query, 5) };
+      return { query, results: await tavilySearch(query, 6, topic) };
     } catch (err) {
       return { query, results: [], error: err instanceof Error ? err.message : String(err) };
     }
   });
   const ok = out.filter((r) => !r.error).length;
+  if (ok === 0) throw new Error(`Web search failed for every query: ${out[0]?.error ?? "unknown error"}`);
   onProgress(`Searches done (${ok}/${queries.length} succeeded)`);
   return out;
 }
@@ -63,6 +76,17 @@ export async function selectPagesToFetch(
   searches: SearchBatchResult[],
   maxPages: number,
 ): Promise<string[]> {
+  try {
+    const picked = await pickWithClaude(task, searches, maxPages);
+    if (picked.length) return picked;
+  } catch {
+    // fall through to the simple heuristic
+  }
+  // Fallback: the top result of each search
+  return Array.from(new Set(searches.map((s) => s.results[0]?.url).filter((u): u is string => !!u))).slice(0, maxPages);
+}
+
+async function pickWithClaude(task: string, searches: SearchBatchResult[], maxPages: number): Promise<string[]> {
   const response = await client.messages.create({
     model: CLAUDE_MODEL,
     max_tokens: 16000,
@@ -84,7 +108,9 @@ export async function selectPagesToFetch(
         role: "user",
         content:
           `${task}\n\nBelow are web search results. Pick up to ${maxPages} URLs whose full text is most worth reading ` +
-          `(primary sources first: official documents, filings, press releases, authoritative reports). ` +
+          `Priorities: (1) the vendor's own privacy policy, subprocessor / third-party service provider list, DPA, and trust or security pages; ` +
+          `(2) news investigations, breach reports, lawsuits, and regulator actions; (3) acquisition announcements and ownership sources; ` +
+          `(4) contracts, pricing, and funding pages; (5) advocacy, evaluations, and research. Skip generic listicles, SEO pages, and unrelated companies. ` +
           `Only pick URLs that appear in the results.\n\n${JSON.stringify(searches)}`,
       },
     ],

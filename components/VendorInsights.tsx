@@ -24,54 +24,30 @@ const TRI_STYLES = {
   unknown: "bg-slate-50 text-slate-600 border-slate-200",
 };
 
-// ── At a glance ───────────────────────────────────────────────────────────────
+// ── Quick facts ───────────────────────────────────────────────────────────────
 
-const LAYER_LABELS = {
-  classroom: "Classroom layer",
-  administrative: "Administrative layer",
-  both: "Classroom + Administrative",
-};
-
-export function AtAGlance({ report }: { report: VendorReport }) {
-  const own = report.companyOwnership;
+export function QuickFacts({ report }: { report: VendorReport }) {
   const critical = report.controversies?.filter((c) => c.stance === "critical").length ?? 0;
-  const stats: { label: string; value: string | number; href: string; warn?: boolean }[] = [
-    { label: "Subprocessors", value: report.subprocessors?.length ?? 0, href: "#subprocessors" },
-    { label: "Trackers detected", value: report.trackers?.length ?? 0, href: "#trackers", warn: (report.trackers?.length ?? 0) > 0 },
-    { label: "AI features", value: report.aiFeatures?.length ?? 0, href: "#ai" },
-    { label: "Lawsuits & actions", value: report.lawsuits?.length ?? 0, href: "#lawsuits", warn: (report.lawsuits?.length ?? 0) > 0 },
-    { label: "Critical coverage", value: critical, href: "#controversies", warn: critical > 0 },
-    { label: "Discrepancies", value: report.discrepancies?.length ?? 0, href: "#discrepancies", warn: (report.discrepancies?.length ?? 0) > 0 },
+  const facts: { label: string; value: string | number; warn?: boolean }[] = [
+    { label: "subprocessors", value: report.subprocessors?.length ?? 0 },
+    { label: "trackers in the app", value: report.trackers?.length ?? 0, warn: (report.trackers?.length ?? 0) > 0 },
+    { label: "AI features", value: report.aiFeatures?.length ?? 0 },
+    { label: "lawsuits & legal actions", value: report.lawsuits?.length ?? 0, warn: (report.lawsuits?.length ?? 0) > 0 },
+    { label: "critical news & reports", value: critical, warn: critical > 0 },
+    {
+      label: "public subprocessor list",
+      value: report.privacyDocuments?.subprocessorListUrl ? "Yes" : "No",
+      warn: !report.privacyDocuments?.subprocessorListUrl,
+    },
   ];
-
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      {report.overview && (
-        <p className="p-5 text-[15px] text-slate-700 leading-relaxed border-b border-slate-100">{report.overview}</p>
-      )}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-x divide-y divide-slate-100">
-        {stats.map((s) => (
-          <a key={s.label} href={s.href} className="p-4 hover:bg-slate-50 transition-colors">
-            <p className={`text-2xl font-bold ${s.warn ? "text-red-600" : "text-slate-800"}`}>{s.value}</p>
-            <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
-          </a>
-        ))}
-      </div>
-      <div className="flex flex-wrap gap-x-6 gap-y-2 px-5 py-3 bg-slate-50 border-t border-slate-100 text-xs text-slate-600">
-        <span>
-          <span className="text-slate-400">Owned by </span>
-          <span className="font-semibold text-slate-800">{own?.currentParentCompany ?? "Independent / not found"}</span>
-          {own?.isPEOwned && <span className="ml-1.5 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold">Private equity</span>}
-        </span>
-        {report.layer && (
-          <span><span className="text-slate-400">Operates in </span><span className="font-semibold text-slate-800">{LAYER_LABELS[report.layer]}</span></span>
-        )}
-        {report.privacyDocuments?.subprocessorListUrl ? (
-          <span className="text-green-700">Publishes a subprocessor list</span>
-        ) : (
-          <span className="text-amber-700">No public subprocessor list found</span>
-        )}
-      </div>
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      {facts.map((f) => (
+        <div key={f.label} className="rounded-xl bg-white border border-slate-200 px-4 py-3">
+          <p className={`text-2xl font-semibold ${f.warn ? "text-red-600" : "text-slate-900"}`}>{f.value}</p>
+          <p className="text-xs text-slate-500">{f.label}</p>
+        </div>
+      ))}
     </div>
   );
 }

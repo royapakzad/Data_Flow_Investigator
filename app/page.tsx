@@ -11,77 +11,55 @@ import { OwnershipGraph } from "@/components/OwnershipGraph";
 
 // ── Progress panel ────────────────────────────────────────────────────────────
 
-const ESTIMATED_STEPS = { vendor: 34, county: 28 };
+const PHASES = [
+  { label: "Searching", hint: "Running the research plan's searches in parallel" },
+  { label: "Reading", hint: "Choosing and reading the most relevant pages" },
+  { label: "Analyzing", hint: "Following up on gaps and writing the report" },
+];
 
-function ProgressPanel({
-  log,
-  mode,
-  onCancel,
-}: {
-  log: string[];
-  mode: "vendor" | "county";
-  onCancel: () => void;
-}) {
-  const total = ESTIMATED_STEPS[mode];
-  // Extract step number from messages like "[12] Searching: ..."
-  const lastNumbered = [...log].reverse().find((m) => m.match(/^\[(\d+)\]/));
-  const current = lastNumbered ? parseInt(lastNumbered.match(/^\[(\d+)\]/)![1]) : 0;
-  const pct = Math.min(95, Math.round((current / total) * 100));
-  const isCompiling = log[log.length - 1] === "Compiling final report…";
-  const currentLabel = log[log.length - 1] ?? "Initializing…";
-  // Strip the [N] prefix for display
-  const displayLabel = currentLabel.replace(/^\[\d+\]\s*/, "");
-  // Last 4 completed steps (excluding current)
-  const history = log.slice(-5, -1).reverse();
+function currentPhase(log: string[]): number {
+  for (let i = log.length - 1; i >= 0; i--) {
+    const m = log[i];
+    if (m.startsWith("Analyzing") || m.startsWith("[follow-up") || m.startsWith("Compiling")) return 2;
+    if (m.startsWith("Choosing") || m.startsWith("Fetching")) return 1;
+  }
+  return 0;
+}
+
+function ProgressPanel({ log, onCancel }: { log: string[]; onCancel: () => void }) {
+  const phase = currentPhase(log);
+  const latest = (log[log.length - 1] ?? "Starting…").replace(/^\[[^\]]+\]\s*/, "");
+  const fetched = log.filter((m) => m.startsWith("Fetching")).length;
+  const followUps = log.filter((m) => m.startsWith("[follow-up")).length;
+  const detail =
+    phase === 1 && fetched ? `${fetched} pages` :
+    phase === 2 && followUps ? `${followUps} follow-up lookups` : null;
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm no-print">
-      {/* Header row */}
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm no-print" aria-live="polite">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin shrink-0" />
-          <span className="text-slate-800 text-sm font-semibold">
-            {isCompiling ? "Compiling report…" : "Agent is investigating"}
-          </span>
+          <span className="text-slate-800 text-sm font-semibold">{PHASES[phase].hint}…</span>
         </div>
-        <button
-          onClick={onCancel}
-          className="text-xs text-slate-500 hover:text-slate-700 transition-colors px-2 py-1 rounded hover:bg-slate-200"
-        >
+        <button onClick={onCancel}
+          className="text-xs text-slate-500 hover:text-slate-700 transition-colors px-2 py-1 rounded hover:bg-slate-100">
           Cancel
         </button>
       </div>
 
-      {/* Progress bar */}
-      <div className="space-y-1.5">
-        <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-          <span className="text-slate-500">{isCompiling ? "Generating JSON output…" : `Step ${current} of ~${total}`}</span>
-          <span>{isCompiling ? "95%" : `${pct}%`}</span>
-        </div>
-        <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
-          <div
-            className="h-full rounded-full bg-blue-500 transition-all duration-700"
-            style={{ width: `${isCompiling ? 95 : pct}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Current step */}
-      <div className="rounded-xl bg-white border border-slate-200 px-4 py-3">
-        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Current</p>
-        <p className="text-slate-800 text-sm leading-snug font-mono break-all">{displayLabel}</p>
-      </div>
-
-      {/* Recent history */}
-      {history.length > 0 && (
-        <div className="space-y-1">
-          {history.map((msg, i) => (
-            <p key={i} className="text-[11px] text-slate-400 font-mono truncate pl-1">
-              {msg.replace(/^\[\d+\]\s*/, "")}
+      <ol className="grid grid-cols-3 gap-2">
+        {PHASES.map((p, i) => (
+          <li key={p.label} className="space-y-1.5">
+            <div className={`h-1.5 rounded-full transition-colors duration-500 ${i < phase ? "bg-blue-500" : i === phase ? "bg-blue-300 animate-pulse" : "bg-slate-200"}`} />
+            <p className={`text-xs ${i <= phase ? "text-slate-700 font-medium" : "text-slate-400"}`}>
+              {i + 1}. {p.label}{i === phase && detail ? ` · ${detail}` : ""}
             </p>
-          ))}
-        </div>
-      )}
+          </li>
+        ))}
+      </ol>
+
+      <p className="text-xs text-slate-500 font-mono truncate">{latest}</p>
     </div>
   );
 }
@@ -106,7 +84,7 @@ function MapSkeleton() {
 
 type AppMode = "vendor" | "county" | "ownership";
 
-const VENDOR_EXAMPLES = ["Teaching Strategies", "Kickboard", "ClassDojo", "Seesaw", "Canvas LMS", "iReady", "IXL"];
+const VENDOR_EXAMPLES = ["ClassDojo", "Seesaw", "i-Ready", "Teaching Strategies GOLD", "PowerSchool", "Renaissance Star", "MagicSchool"];
 
 // ── Vendor Analyzer tab ───────────────────────────────────────────────────────
 
@@ -204,8 +182,7 @@ function VendorAnalyzer() {
   return (
     <div className="space-y-6">
       <p className="text-slate-600 max-w-2xl text-base leading-relaxed no-print">
-        Enter an edtech vendor or app name to retrieve their privacy policy, subprocessor chain,
-        detected trackers, company ownership, and known legal actions.
+        Where an app sends student data, how the company makes money, who owns it, and the lawsuits and controversies around it.
       </p>
 
       <form onSubmit={(e) => { e.preventDefault(); analyze(vendorName, districtName); }} className="space-y-3 no-print">
@@ -214,7 +191,7 @@ function VendorAnalyzer() {
             type="text"
             value={vendorName}
             onChange={(e) => setVendorName(e.target.value)}
-            placeholder="e.g. Teaching Strategies, Kickboard, ClassDojo…"
+            placeholder="App or vendor, e.g. ClassDojo"
             disabled={loading}
             className="flex-1 px-4 py-3 rounded-xl bg-white border border-slate-300 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 disabled:opacity-50 transition-colors"
           />
@@ -227,7 +204,7 @@ function VendorAnalyzer() {
           type="text"
           value={districtName}
           onChange={(e) => setDistrictName(e.target.value)}
-          placeholder="School district (optional), e.g. Austin ISD, Los Angeles Unified"
+          placeholder="School district (optional): adds local contracts, news, and community concerns"
           disabled={loading}
           className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 placeholder-slate-400 text-sm focus:outline-none focus:border-blue-400 disabled:opacity-50 transition-colors"
         />
@@ -243,11 +220,7 @@ function VendorAnalyzer() {
       </form>
 
       {loading && (
-        <ProgressPanel
-          log={progressLog}
-          mode="vendor"
-          onCancel={cancel}
-        />
+        <ProgressPanel log={progressLog} onCancel={cancel} />
       )}
 
       {error && (
@@ -271,8 +244,8 @@ function VendorAnalyzer() {
 
       {!loading && !report && !error && (
         <p className="text-center text-xs text-slate-600 max-w-xl mx-auto">
-          Automated analysis of public disclosures. Does not perform dynamic traffic interception or
-          legal interpretation of data processing agreements. Verify findings before procurement decisions.
+          Research takes a minute or two. It reads public sources only: no network traffic capture or legal
+          review. Check the linked sources before relying on a finding.
         </p>
       )}
     </div>
@@ -281,7 +254,7 @@ function VendorAnalyzer() {
 
 // ── Ownership Network tab ─────────────────────────────────────────────────────
 
-const OWNERSHIP_EXAMPLES = ["IXL Learning", "PowerSchool", "Frontline Education", "Renaissance Learning", "ClassDojo"];
+const OWNERSHIP_EXAMPLES = ["PowerSchool", "Instructure", "Teaching Strategies", "HMH", "Renaissance Learning", "IXL Learning"];
 
 function OwnershipExplorer() {
   const [companyName, setCompanyName] = useState("");
@@ -327,8 +300,7 @@ function OwnershipExplorer() {
   return (
     <div className="space-y-6">
       <p className="text-slate-600 max-w-2xl text-base leading-relaxed no-print">
-        Enter any edtech company to trace its full ownership chain, up through every acquirer to
-        the private equity firm (if applicable), with their complete portfolio of other companies.
+        Every acquisition up to the ultimate owner, what the company has bought, and a private equity owner&apos;s other education holdings.
       </p>
 
       <form onSubmit={(e) => { e.preventDefault(); search(companyName); }} className="space-y-3 no-print">
@@ -571,8 +543,7 @@ function CountyExplorer() {
   return (
     <div className="space-y-6">
       <p className="text-slate-600 max-w-2xl text-base leading-relaxed no-print">
-        Click any county on the map or type a county name below to investigate its public
-        education data integration ecosystem from preschool through K-12.
+        The government side of student data: state data systems, who built them, and where records are linked beyond schools.
       </p>
 
       {/* ── County text search ──────────────────────────────────────────── */}
@@ -610,11 +581,7 @@ function CountyExplorer() {
       )}
 
       {loading && (
-        <ProgressPanel
-          log={progressLog}
-          mode="county"
-          onCancel={cancel}
-        />
+        <ProgressPanel log={progressLog} onCancel={cancel} />
       )}
 
       {error && (
@@ -660,14 +627,14 @@ export default function Home() {
 
         {/* Hero */}
         <div className="text-center space-y-5 no-print">
-          <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-sm font-semibold tracking-wide">
-            For schools, districts, and advocates
+          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-sm font-semibold tracking-wide">
+            Follow the data. Follow the money.
           </span>
           <h1 className="text-5xl font-bold text-slate-900 tracking-tight">
             Education Data Investigator
           </h1>
-          <p className="text-slate-500 max-w-xl mx-auto text-lg leading-relaxed">
-            Understand how student data moves through the education system and who controls it.
+          <p className="text-slate-500 max-w-2xl mx-auto text-lg leading-relaxed">
+            Research edtech vendors and the state systems student records flow into. For parents, teachers, districts, advocates, and journalists.
           </p>
         </div>
 
@@ -682,7 +649,7 @@ export default function Home() {
                   : "text-slate-500 hover:text-slate-700 hover:bg-white/60"
               }`}
             >
-              🔍 Vendor Analyzer
+              Vendors
             </button>
             <button
               onClick={() => setMode("ownership")}
@@ -692,7 +659,7 @@ export default function Home() {
                   : "text-slate-500 hover:text-slate-700 hover:bg-white/60"
               }`}
             >
-              🏢 Ownership Network
+              Ownership
             </button>
             <button
               onClick={() => setMode("county")}
@@ -702,14 +669,9 @@ export default function Home() {
                   : "text-slate-500 hover:text-slate-700 hover:bg-white/60"
               }`}
             >
-              🗺 County Data
+              State & county systems
             </button>
           </div>
-          <p className="text-center text-sm text-slate-400 mt-3">
-            {mode === "vendor"   && "Analyze a specific edtech app's data flows, subprocessors, and ownership"}
-            {mode === "ownership" && "Trace any edtech company's acquisition chain up to private equity, with full PE portfolio"}
-            {mode === "county"   && "Map public education data infrastructure (SLDS, ECIDS, KEA, cross-sector linkages) by county"}
-          </p>
         </div>
 
         {/* Active mode */}

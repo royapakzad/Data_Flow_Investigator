@@ -80,3 +80,7 @@ body {
   /* But NOT for badge/icon links */
   a.group::after, a[class*="rounded"]::after { content: none; }
 }
+
+html { scroll-behavior: smooth; }
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ReportTabs } from "./ReportTabs";
 import type {
   CountyReport,
   EduDataSystem,
@@ -30,12 +31,11 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="space-y-5 scroll-mt-6">
-      <div className="space-y-1">
+    <section id={id} className="space-y-4 scroll-mt-16">
+      <div className="space-y-0.5">
         <h2 className="text-lg font-semibold text-slate-900 tracking-tight">{title}</h2>
-        {subtitle && <p className="text-sm text-slate-500 leading-relaxed">{subtitle}</p>}
+        {subtitle && <p className="text-sm text-slate-500">{subtitle}</p>}
       </div>
-      <div className="border-t border-slate-100" />
       {children}
     </section>
   );
@@ -44,7 +44,7 @@ function Section({
 function CiteBadge({ citation }: { citation: Citation }) {
   return (
     <a
-      href={`#county-citation-${citation.number}`}
+      href={citation.url} target="_blank" rel="noopener noreferrer"
       className="group relative inline-flex items-center mx-0.5 align-super"
     >
       <span className="text-[10px] font-mono font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-1 py-0.5 rounded hover:bg-blue-100 transition-colors leading-none">
@@ -495,166 +495,129 @@ export function CountyReport({ report }: Props) {
   const gapSafeguards   = report.safeguards.filter((s) => s.category === "gap");
   const otherSafeguards = report.safeguards.filter((s) => ["policy","technical"].includes(s.category));
 
-  return (
-    <div className="space-y-12">
+  const systemGroups = [
+    { title: "Statewide longitudinal data system (SLDS / P-20W)", subtitle: "The state warehouse that links a child's records from early childhood into the workforce.", items: sldsSystems },
+    { title: "Early childhood data (ECIDS)", subtitle: "Preschool, Head Start, and child care data before kindergarten.", items: ecidsSystems },
+    { title: "Kindergarten entry assessment", subtitle: "How children are assessed at kindergarten entry, and with what tool.", items: keaSystems },
+    { title: "Federal reporting", subtitle: "Data the state sends to federal agencies.", items: federalSystems },
+    { title: "Other systems", items: otherSystems },
+  ].filter((g) => g.items.length > 0);
 
-      {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-              {report.countyName} County
-            </h1>
-            <p className="text-slate-500 text-base mt-1 font-medium">{report.stateName}</p>
-            <p className="text-sm text-slate-400 mt-1">
-              FIPS {report.fipsCode} · Analysis:{" "}
-              {new Date(report.analysisDate).toLocaleDateString("en-US", {
-                year: "numeric", month: "long", day: "numeric",
-              })}
+  const tabs = [
+    {
+      id: "summary",
+      label: "Summary",
+      content: (
+        <>
+          {report.keyFindings?.length > 0 && (
+            <Section title="What to know">
+              <ol className="space-y-3">
+                {report.keyFindings.map((f, i) => (
+                  <li key={i} className="flex gap-3">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
+                    <p className="text-[15px] text-slate-800 leading-relaxed">{f}</p>
+                  </li>
+                ))}
+              </ol>
+            </Section>
+          )}
+          {report.dataAvailabilityNote && (
+            <p className="rounded-xl bg-white border border-slate-200 px-4 py-3 text-sm text-slate-600">
+              <span className="font-semibold text-slate-800">County vs. state: </span>{report.dataAvailabilityNote}
             </p>
-          </div>
-          <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold bg-blue-100 text-blue-800 border border-blue-200">
-            <span className="w-2 h-2 rounded-full bg-blue-500" />
-            PreK–K12 Data Systems
-          </span>
-        </div>
-
-        {/* Data availability note */}
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex gap-3">
-          <span className="text-amber-500 shrink-0 mt-0.5">⚠</span>
-          <div className="text-sm">
-            <span className="font-semibold text-amber-800">Data scope note: </span>
-            <span className="text-amber-800">{report.dataAvailabilityNote}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Key Findings ───────────────────────────────────────────────── */}
-      {report.keyFindings?.length > 0 && (
-        <Section title="Key Findings"
-          subtitle="What this research found about the education data ecosystem serving this county.">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {report.keyFindings.map((f, i) => (
-              <div key={i} className="flex gap-3 p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
-                <span className="shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center mt-0.5 border border-blue-200">
-                  {i + 1}
-                </span>
-                <p className="text-slate-700 text-sm leading-relaxed">{f}</p>
+          )}
+        </>
+      ),
+    },
+    {
+      id: "systems",
+      label: "Education data systems",
+      count: report.educationSystems.length,
+      content: (
+        <>
+          {systemGroups.map((g) => (
+            <Section key={g.title} title={g.title} subtitle={g.subtitle}>
+              <div className="space-y-4">
+                {g.items.map((s, i) => <EduSystemCard key={i} system={s} getCite={getCite} />)}
               </div>
-            ))}
-          </div>
+            </Section>
+          ))}
+        </>
+      ),
+    },
+    {
+      id: "linkages",
+      label: "Beyond education",
+      count: report.crossSectorLinkages?.length ?? 0,
+      content: (
+        <Section title="Where records are linked beyond schools"
+          subtitle="Workforce, health, child welfare, justice, migration, and military connections.">
+          {report.crossSectorLinkages?.length > 0 ? (
+            <div className="space-y-4">
+              {report.crossSectorLinkages.map((l, i) => <CrossSectorCard key={i} linkage={l} getCite={getCite} />)}
+            </div>
+          ) : (
+            <p className="rounded-xl bg-white border border-slate-200 p-4 text-sm text-slate-500">No cross-agency linkages found in public sources.</p>
+          )}
         </Section>
-      )}
-
-      {/* ── SLDS ───────────────────────────────────────────────────────── */}
-      {sldsSystems.length > 0 && (
-        <Section
-          title="P-20W Statewide Longitudinal Data System (SLDS)"
-          subtitle="The state's backbone education data warehouse tracking students from early childhood through workforce. Applies to all counties in the state.">
-          <div className="space-y-4">
-            {sldsSystems.map((s, i) => <EduSystemCard key={i} system={s} getCite={getCite} />)}
-          </div>
+      ),
+    },
+    {
+      id: "protections",
+      label: "Protections & gaps",
+      count: report.safeguards.length,
+      content: (
+        <>
+          {gapSafeguards.length > 0 && (
+            <Section title="Gaps" subtitle="Where protections are missing or weak.">
+              <div className="space-y-3">{gapSafeguards.map((s, i) => <SafeguardRow key={i} safeguard={s} getCite={getCite} />)}</div>
+            </Section>
+          )}
+          {lawSafeguards.length > 0 && (
+            <Section title="Laws">
+              <div className="space-y-3">{lawSafeguards.map((s, i) => <SafeguardRow key={i} safeguard={s} getCite={getCite} />)}</div>
+            </Section>
+          )}
+          {otherSafeguards.length > 0 && (
+            <Section title="Policies & technical controls">
+              <div className="space-y-3">{otherSafeguards.map((s, i) => <SafeguardRow key={i} safeguard={s} getCite={getCite} />)}</div>
+            </Section>
+          )}
+        </>
+      ),
+    },
+    {
+      id: "questions",
+      label: "Questions",
+      count: report.questionsToAsk?.length ?? 0,
+      content: (
+        <Section title="Questions to ask your school board or state" subtitle="Based on gaps found in this research. Edit before you share them.">
+          <EditableQuestions initialQuestions={report.questionsToAsk ?? []} />
         </Section>
-      )}
-
-      {/* ── ECIDS ──────────────────────────────────────────────────────── */}
-      {ecidsSystems.length > 0 && (
-        <Section
-          title="Early Childhood Integrated Data System (ECIDS)"
-          subtitle="State system integrating data from preschool, Head Start, childcare, and other early childhood programs before kindergarten.">
-          <div className="space-y-4">
-            {ecidsSystems.map((s, i) => <EduSystemCard key={i} system={s} getCite={getCite} />)}
-          </div>
+      ),
+    },
+    {
+      id: "sources",
+      label: "Sources",
+      count: report.citations?.length ?? 0,
+      content: (
+        <Section title="Sources" subtitle="Every finding links to one of these.">
+          <CitationsList citations={report.citations ?? []} />
         </Section>
-      )}
+      ),
+    },
+  ];
 
-      {/* ── KEA ────────────────────────────────────────────────────────── */}
-      {keaSystems.length > 0 && (
-        <Section
-          title="Kindergarten Entry Assessment (KEA)"
-          subtitle="How the state assesses children's readiness at kindergarten entry and what data is collected.">
-          <div className="space-y-4">
-            {keaSystems.map((s, i) => <EduSystemCard key={i} system={s} getCite={getCite} />)}
-          </div>
-        </Section>
-      )}
-
-      {/* ── Federal systems ────────────────────────────────────────────── */}
-      {federalSystems.length > 0 && (
-        <Section
-          title="Federal Data Reporting & Collections"
-          subtitle="Federally mandated data submissions that flow from state/district systems to federal agencies.">
-          <div className="space-y-4">
-            {federalSystems.map((s, i) => <EduSystemCard key={i} system={s} getCite={getCite} />)}
-          </div>
-        </Section>
-      )}
-
-      {/* ── Other systems ──────────────────────────────────────────────── */}
-      {otherSystems.length > 0 && (
-        <Section title="Additional Education Data Systems">
-          <div className="space-y-4">
-            {otherSystems.map((s, i) => <EduSystemCard key={i} system={s} getCite={getCite} />)}
-          </div>
-        </Section>
-      )}
-
-      {/* ── Cross-sector linkages ───────────────────────────────────────── */}
-      {report.crossSectorLinkages?.length > 0 && (
-        <Section
-          title="Cross-Sector Data Linkages"
-          subtitle="Where education data flows beyond the school system — into workforce, health, justice, military, and migration systems.">
-          <div className="space-y-4">
-            {report.crossSectorLinkages.map((l, i) => (
-              <CrossSectorCard key={i} linkage={l} getCite={getCite} />
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* ── Laws & Protections ─────────────────────────────────────────── */}
-      {lawSafeguards.length > 0 && (
-        <Section
-          title="Applicable Laws & Protections"
-          subtitle="Federal and state laws governing how education data can be collected, shared, and used.">
-          <div className="space-y-3">
-            {lawSafeguards.map((s, i) => <SafeguardRow key={i} safeguard={s} getCite={getCite} />)}
-          </div>
-        </Section>
-      )}
-
-      {/* ── Policies, Controls & Gaps ──────────────────────────────────── */}
-      {(otherSafeguards.length > 0 || gapSafeguards.length > 0) && (
-        <Section
-          title="Policies, Technical Controls & Gaps"
-          subtitle="Administrative policies, technical safeguards, and identified gaps in protection.">
-          <div className="space-y-3">
-            {[...otherSafeguards, ...gapSafeguards].map((s, i) => (
-              <SafeguardRow key={i} safeguard={s} getCite={getCite} />
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* ── Questions ──────────────────────────────────────────────────── */}
-      {report.questionsToAsk?.length > 0 && (
-        <Section
-          title="Questions to Ask Your School Board or State DOE"
-          subtitle="Specific questions for parents, advocates, or journalists based on gaps found in this analysis.">
-          <EditableQuestions initialQuestions={report.questionsToAsk} />
-        </Section>
-      )}
-
-      {/* ── Citations ──────────────────────────────────────────────────── */}
-      {report.citations?.length > 0 && (
-        <Section
-          id="county-citations"
-          title="Sources & Citations"
-          subtitle="Every claim in this report is backed by a source. Click any [N] badge above to jump to its source.">
-          <CitationsList citations={report.citations} />
-        </Section>
-      )}
-
+  return (
+    <div className="space-y-6">
+      <header className="space-y-1">
+        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{report.countyName} County, {report.stateName}</h1>
+        <p className="text-sm text-slate-500">
+          Public education data systems, preschool–12 · Researched{" "}
+          {new Date(report.analysisDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+        </p>
+      </header>
+      <ReportTabs tabs={tabs} />
     </div>
   );
 }

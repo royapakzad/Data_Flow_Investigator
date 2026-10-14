@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Vendor Data Flow Analyzer",
-  description: "AI-powered edtech vendor data privacy analysis for schools and districts",
+  title: "Education Data Investigator",
+  description: "Explore edtech vendors, subprocessors, ownership, lawsuits, controversies, and the state systems student data flows into.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

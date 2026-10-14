@@ -179,6 +179,7 @@ export interface VendorReport {
   analysisDate: string;
   riskLevel: RiskLevel;
   overview?: string;
+  keyFindings?: string[];
   layer?: VendorLayer;
   summary: {
     directSubprocessors: number;

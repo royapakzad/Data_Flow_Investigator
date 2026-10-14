@@ -76,7 +76,7 @@ export function SubprocessorTable({ report, citations = [] }: Props) {
                     )}
                     {cite && (
                       <a
-                        href={`#citation-${cite.number}`}
+                        href={cite.url} target="_blank" rel="noopener noreferrer"
                         title={`${cite.label}: ${cite.context}`}
                         className="group relative"
                       >

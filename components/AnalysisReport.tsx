@@ -6,7 +6,8 @@ import { DataFlowDiagram } from "./DataFlowDiagram";
 import { DiscrepancyList } from "./DiscrepancyList";
 import { SubprocessorTable } from "./SubprocessorTable";
 import { CompanyHistory } from "./CompanyHistory";
-import { AtAGlance, BusinessModelView, AIFeaturesView, ScoresView, ControversiesView, QuestionBank, LookItUp } from "./VendorInsights";
+import { ReportTabs } from "./ReportTabs";
+import { QuickFacts, BusinessModelView, AIFeaturesView, ScoresView, ControversiesView, QuestionBank, LookItUp } from "./VendorInsights";
 
 interface Props {
   report: VendorReport;
@@ -121,12 +122,11 @@ function Section({ id, title, children, subtitle }: {
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="space-y-5 scroll-mt-6">
-      <div className="space-y-1">
+    <section id={id} className="space-y-4 scroll-mt-16">
+      <div className="space-y-0.5">
         <h2 className="text-lg font-semibold text-slate-900 tracking-tight">{title}</h2>
-        {subtitle && <p className="text-sm text-slate-500 leading-relaxed">{subtitle}</p>}
+        {subtitle && <p className="text-sm text-slate-500">{subtitle}</p>}
       </div>
-      <div className="border-t border-slate-100" />
       {children}
     </section>
   );
@@ -136,7 +136,7 @@ function Section({ id, title, children, subtitle }: {
 function CiteBadge({ citation }: { citation: Citation }) {
   return (
     <a
-      href={`#citation-${citation.number}`}
+      href={citation.url} target="_blank" rel="noopener noreferrer"
       className="group relative inline-flex items-center mx-0.5 align-super"
     >
       <span className="text-[10px] font-mono font-bold text-blue-600 bg-blue-50 border border-blue-300 px-1 py-0.5 rounded hover:bg-blue-100 transition-colors leading-none">
@@ -256,188 +256,199 @@ const RISK_LABELS = {
   "low-concern": "Lower concern",
 };
 
-// ── Section nav ───────────────────────────────────────────────────────────────
-function SectionNav({ items }: { items: { id: string; label: string }[] }) {
-  return (
-    <nav className="sticky top-0 z-30 -mx-4 px-4 py-2 bg-white/90 backdrop-blur border-b border-slate-200 no-print">
-      <div className="flex gap-1 overflow-x-auto scrollbar-none">
-        {items.map((it) => (
-          <a key={it.id} href={`#${it.id}`}
-            className="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors">
-            {it.label}
-          </a>
-        ))}
-      </div>
-    </nav>
-  );
-}
+const LAYER_LABELS = { classroom: "Classroom layer", administrative: "Administrative layer", both: "Classroom + administrative layers" };
 
 export function AnalysisReport({ report }: Props) {
-  const docs = report.privacyDocuments;
+  const docs = report.privacyDocuments ?? {};
   const citations = report.citations ?? [];
   const getCite = useCiteByUrl(citations);
-  const hasDocs = !!(docs.privacyPolicyUrl || docs.dpaUrl || docs.subprocessorListUrl || docs.appStoreUrl || docs.playStoreUrl);
+  const own = report.companyOwnership;
   const name = report.appName || report.vendorName;
+  const docLinks = [
+    { href: docs.privacyPolicyUrl, label: "Privacy policy" },
+    { href: docs.subprocessorListUrl, label: "Subprocessor list" },
+    { href: docs.dpaUrl, label: "Data processing agreement" },
+    { href: docs.appStoreUrl, label: "App Store" },
+    { href: docs.playStoreUrl, label: "Play Store" },
+  ].filter((d): d is { href: string; label: string } => !!d.href);
 
-  const nav = [
-    { id: "data-flow", label: "Data flow", show: report.dataFlowNodes?.length > 0 },
-    { id: "subprocessors", label: "Subprocessors", show: report.subprocessors?.length > 0 },
-    { id: "ai", label: "AI & predictions", show: true },
-    { id: "discrepancies", label: "Discrepancies", show: true },
-    { id: "money", label: "Follow the money", show: true },
-    { id: "ownership", label: "Ownership", show: !!report.companyOwnership },
-    { id: "lawsuits", label: "Lawsuits", show: true },
-    { id: "controversies", label: "Controversies & advocacy", show: true },
-    { id: "questions", label: "Questions", show: true },
-    { id: "lookups", label: "Look it up", show: true },
-    { id: "citations", label: "Sources", show: citations.length > 0 },
-  ].filter((n) => n.show);
+  const legalCount = (report.lawsuits?.length ?? 0) + (report.controversies?.length ?? 0);
+  const aiCount = (report.aiFeatures?.length ?? 0) + (report.scoresAndPredictions?.length ?? 0);
+
+  const tabs = [
+    {
+      id: "summary",
+      label: "Summary",
+      content: (
+        <>
+          {report.keyFindings && report.keyFindings.length > 0 && (
+            <Section title="What to know">
+              <ol className="space-y-3">
+                {report.keyFindings.map((f, i) => (
+                  <li key={i} className="flex gap-3">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-slate-900 text-white text-xs font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
+                    <p className="text-[15px] text-slate-800 leading-relaxed">{f}</p>
+                  </li>
+                ))}
+              </ol>
+            </Section>
+          )}
+          <QuickFacts report={report} />
+          {docLinks.length > 0 && (
+            <Section title="Read the originals">
+              <div className="flex flex-wrap gap-2">
+                {docLinks.map((d) => <DocPill key={d.label} href={d.href} label={d.label} cite={getCite(d.href)} />)}
+              </div>
+              {docs.lastUpdated && <p className="text-xs text-slate-400">Privacy policy last updated {docs.lastUpdated}</p>}
+            </Section>
+          )}
+          <Section title="Look it up yourself" subtitle="Independent sources this research doesn't cover.">
+            <LookItUp name={name} />
+          </Section>
+        </>
+      ),
+    },
+    {
+      id: "data",
+      label: "Where data goes",
+      count: report.subprocessors?.length ?? 0,
+      content: (
+        <>
+          <Section title="What they say vs. what was found" subtitle="Gaps between the vendor's disclosures and what was detected or reported elsewhere.">
+            <DiscrepancyList report={report} />
+          </Section>
+          {report.dataFlowNodes?.length > 0 && (
+            <Section title="Data flow" subtitle="The app's own vendors on one side, school and state systems on the other.">
+              <DataFlowDiagram nodes={report.dataFlowNodes} citations={citations} />
+            </Section>
+          )}
+          {report.subprocessors?.length > 0 && (
+            <Section title="Subprocessors" subtitle="Companies that handle student data for the vendor: declared, detected, or inferred.">
+              <SubprocessorTable report={report} citations={citations} />
+            </Section>
+          )}
+          {report.trackers?.length > 0 && (
+            <Section title="Trackers in the Android app" subtitle="Detected by Exodus Privacy.">
+              <div className="flex flex-wrap gap-2">
+                {report.trackers.map((t, i) => (
+                  <span key={i} className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-sm">
+                    {t.website ? <a href={t.website} target="_blank" rel="noopener noreferrer" className="font-medium text-slate-800 hover:underline">{t.name}</a> : <span className="font-medium text-slate-800">{t.name}</span>}
+                    <span className="ml-1.5 text-xs text-slate-400">{t.category}</span>
+                  </span>
+                ))}
+              </div>
+            </Section>
+          )}
+        </>
+      ),
+    },
+    {
+      id: "ai",
+      label: "AI & predictions",
+      count: aiCount,
+      content: (
+        <>
+          <Section title="AI features" subtitle="AI providers that may process student data.">
+            <AIFeaturesView features={report.aiFeatures} />
+          </Section>
+          <Section title="Scores, risk flags & predictions" subtitle="Outputs that can become part of a child's official school record.">
+            <ScoresView items={report.scoresAndPredictions} />
+          </Section>
+        </>
+      ),
+    },
+    {
+      id: "money",
+      label: "Money & owners",
+      content: (
+        <>
+          <Section title="How it makes money">
+            <BusinessModelView model={report.businessModel} />
+          </Section>
+          {own && (
+            <Section title="Who owns it" subtitle="The company holding the data today may not be the one the district signed with.">
+              <CompanyHistory ownership={own} />
+            </Section>
+          )}
+        </>
+      ),
+    },
+    {
+      id: "legal",
+      label: "Lawsuits & controversies",
+      count: legalCount,
+      content: (
+        <>
+          <Section title="Lawsuits & legal actions">
+            {report.lawsuits && report.lawsuits.length > 0 ? (
+              <LawsuitsList lawsuits={report.lawsuits} />
+            ) : (
+              <p className="rounded-xl bg-white border border-slate-200 p-4 text-sm text-slate-500">
+                None found in public sources. That isn&apos;t proof none exist.
+              </p>
+            )}
+          </Section>
+          <Section title="Controversies & advocacy" subtitle="Breaches, investigations, community concerns, campaigns for and against, evaluations, and research.">
+            <ControversiesView items={report.controversies} />
+          </Section>
+        </>
+      ),
+    },
+    {
+      id: "questions",
+      label: "Questions",
+      count: report.vendorQuestions?.length ?? 0,
+      content: (
+        <>
+          <Section title="Questions for this vendor" subtitle="Based on gaps found in this research. Edit before you share them.">
+            <EditableQuestions initialQuestions={report.vendorQuestions ?? []} />
+          </Section>
+          <QuestionBank />
+          {report.humanInLoopSteps?.length > 0 && (
+            <Section title="What still needs a person" subtitle="Things automated research can't check.">
+              <ul className="space-y-2">
+                {report.humanInLoopSteps.map((step, i) => (
+                  <li key={i} className="flex gap-3 text-sm text-slate-700 leading-relaxed">
+                    <span className="text-slate-300 shrink-0">—</span>{step}
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
+        </>
+      ),
+    },
+    {
+      id: "sources",
+      label: "Sources",
+      count: citations.length,
+      content: (
+        <Section title="Sources" subtitle="Every finding links to one of these.">
+          <CitationsList citations={citations} />
+        </Section>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-10">
-
-      {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="space-y-4">
+    <div className="space-y-6">
+      <header className="space-y-3">
         <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">{report.vendorName}</h1>
-            {report.appName && report.appName !== report.vendorName && (
-              <p className="text-slate-500 text-sm mt-1">App: {report.appName}</p>
-            )}
-            <p className="text-xs text-slate-400 mt-1">
-              Researched {new Date(report.analysisDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} from public sources
-            </p>
-          </div>
-          <span className={`px-4 py-2 rounded-full text-sm font-semibold border ${RISK_STYLES[report.riskLevel]}`}>
+          <h1 className="text-3xl font-bold text-slate-900">{report.vendorName}</h1>
+          <span className={`px-3 py-1 rounded-full text-sm font-semibold border ${RISK_STYLES[report.riskLevel]}`}>
             {RISK_LABELS[report.riskLevel]}
           </span>
         </div>
-        <AtAGlance report={report} />
-        {hasDocs && (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400 mr-1">Read the originals</span>
-            {docs.privacyPolicyUrl    && <DocPill href={docs.privacyPolicyUrl}    label="Privacy policy"            cite={getCite(docs.privacyPolicyUrl)} />}
-            {docs.dpaUrl              && <DocPill href={docs.dpaUrl}              label="Data processing agreement" cite={getCite(docs.dpaUrl)} />}
-            {docs.subprocessorListUrl && <DocPill href={docs.subprocessorListUrl} label="Subprocessor list"         cite={getCite(docs.subprocessorListUrl)} />}
-            {docs.appStoreUrl         && <DocPill href={docs.appStoreUrl}         label="App Store"                 cite={getCite(docs.appStoreUrl)} />}
-            {docs.playStoreUrl        && <DocPill href={docs.playStoreUrl}        label="Play Store"                cite={getCite(docs.playStoreUrl)} />}
-            {docs.lastUpdated && <span className="text-xs text-slate-400">Policy updated {docs.lastUpdated}</span>}
-          </div>
-        )}
-      </div>
+        <p className="text-sm text-slate-500">
+          {report.appName && report.appName !== report.vendorName && <>{report.appName} · </>}
+          {own?.currentParentCompany ? <>Owned by <span className="text-slate-700 font-medium">{own.currentParentCompany}</span>{own.isPEOwned && " (private equity)"} · </> : null}
+          {report.layer && <>{LAYER_LABELS[report.layer]} · </>}
+          Researched {new Date(report.analysisDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+        </p>
+        {report.overview && <p className="text-base text-slate-700 leading-relaxed max-w-3xl">{report.overview}</p>}
+      </header>
 
-      <SectionNav items={nav} />
-
-      {/* ── FOLLOW THE DATA ────────────────────────────────────────────── */}
-      {report.dataFlowNodes?.length > 0 && (
-        <Section id="data-flow" title="Where student data goes"
-          subtitle="Services the app relies on (its own vendors), the app itself, and the school and state systems it connects to. Hover [N] to see the source.">
-          <DataFlowDiagram nodes={report.dataFlowNodes} citations={citations} />
-        </Section>
-      )}
-
-      {report.subprocessors?.length > 0 && (
-        <Section id="subprocessors" title="Subprocessors: the vendor's own vendors"
-          subtitle="Third parties that handle student data, as declared by the vendor, detected in the app, or inferred. Vendors are allowed to name these only by category, so this list is reconstructed.">
-          <SubprocessorTable report={report} citations={citations} />
-        </Section>
-      )}
-
-      {report.trackers?.length > 0 && (
-        <Section id="trackers" title="Trackers in the Android app"
-          subtitle="SDKs detected by Exodus Privacy.">
-          <div className="flex flex-wrap gap-2">
-            {report.trackers.map((t, i) => (
-              <div key={i} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-50 border border-red-200">
-                {t.website ? (
-                  <a href={t.website} target="_blank" rel="noopener noreferrer"
-                    className="font-medium text-red-700 hover:underline text-sm">{t.name}</a>
-                ) : (
-                  <span className="font-medium text-red-700 text-sm">{t.name}</span>
-                )}
-                <span className="text-xs text-slate-500">{t.category}</span>
-                {t.website && getCite(t.website) && <CiteBadge citation={getCite(t.website)!} />}
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      <Section id="ai" title="AI features, scores & predictions"
-        subtitle="Generative AI providers that may process student data, and scores or risk flags that can become part of a child's official record.">
-        <div className="space-y-6">
-          <AIFeaturesView features={report.aiFeatures} />
-          <ScoresView items={report.scoresAndPredictions} />
-        </div>
-      </Section>
-
-      <Section id="discrepancies" title="What they say vs. what was found"
-        subtitle="Gaps between the vendor's disclosures and what was detected or reported elsewhere.">
-        <DiscrepancyList report={report} />
-      </Section>
-
-      {/* ── FOLLOW THE MONEY ───────────────────────────────────────────── */}
-      <Section id="money" title="Follow the money"
-        subtitle="How the company makes money: licensing, paid upgrades for families, data-derived products, public funding it's marketed against, and public contracts.">
-        <BusinessModelView model={report.businessModel} />
-      </Section>
-
-      {report.companyOwnership && (
-        <Section id="ownership" title="Who owns it"
-          subtitle="The company that holds the data today may not be the one the district signed with. Use the Ownership tab for the full private-equity portfolio.">
-          <CompanyHistory ownership={report.companyOwnership} />
-        </Section>
-      )}
-
-      <Section id="lawsuits" title="Lawsuits & legal actions"
-        subtitle="Lawsuits, regulatory actions, or settlements involving the company or its parent.">
-        {report.lawsuits && report.lawsuits.length > 0 ? (
-          <LawsuitsList lawsuits={report.lawsuits} />
-        ) : (
-          <p className="rounded-xl bg-slate-50 border border-slate-200 p-4 text-sm text-slate-500">
-            None found in public sources during this search. That isn&apos;t proof none exist.
-          </p>
-        )}
-      </Section>
-
-      <Section id="controversies" title="Controversies & advocacy"
-        subtitle="Breaches, investigations, community concerns, and campaigns for and against, plus independent evaluations and research.">
-        <ControversiesView items={report.controversies} />
-      </Section>
-
-      {/* ── TAKE ACTION ────────────────────────────────────────────────── */}
-      <Section id="questions" title="Questions to ask"
-        subtitle="Questions based on gaps found for this vendor. You can edit them before sharing.">
-        <div className="space-y-5">
-          <EditableQuestions initialQuestions={report.vendorQuestions} />
-          <QuestionBank />
-        </div>
-      </Section>
-
-      <Section title="What still needs a human"
-        subtitle="Things this automated research can't do.">
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 space-y-3">
-          {report.humanInLoopSteps.map((step, i) => (
-            <div key={i} className="flex gap-3 text-sm text-slate-700">
-              <span className="text-amber-500 font-bold shrink-0">→</span>
-              <p className="leading-relaxed">{step}</p>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      <Section id="lookups" title="Look it up yourself"
-        subtitle="Independent sources not included in this automated research.">
-        <LookItUp name={name} />
-      </Section>
-
-      {citations.length > 0 && (
-        <Section id="citations" title="Sources"
-          subtitle="Every finding above links back to one of these. Click any [N] badge to jump here.">
-          <CitationsList citations={citations} />
-        </Section>
-      )}
-
+      <ReportTabs tabs={tabs} />
     </div>
   );
 }

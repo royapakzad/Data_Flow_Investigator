@@ -1,8 +1,9 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { runToolLoop, runSearches, selectPagesToFetch, mapLimit, fetchPageText } from "./claude-agent";
+import { runToolLoop, runSearches, selectPagesToFetch, readPages, assertKeys, type SearchQuery } from "./claude-agent";
+import { extractPage } from "./extract";
 import { tavilySearch } from "./tavily-search";
 import { lookupExodus } from "./exodus";
-import { lookupAppStore } from "./appstore";
+import { lookupAppStore, type AppStoreResult } from "./appstore";
 import { buildMermaidDiagram } from "./diagram";
 import type { VendorReport } from "./types";
 
@@ -40,7 +41,7 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [
   {
     name: "fetch_page",
     description:
-      "Fetch a web page and return its text content. Use for privacy policies, DPAs, subprocessor lists. Returns up to 8000 characters.",
+      "Fetch a web page and return its text content. Use for privacy policies, DPAs, subprocessor lists, news articles.",
     input_schema: {
       type: "object",
       properties: {
@@ -137,6 +138,7 @@ After gathering data, output a JSON object matching this schema EXACTLY:
   "analysisDate": "ISO date string",
   "riskLevel": "elevated" | "standard" | "low-concern",
   "overview": string,          // 2-3 plain-language sentences: what the product is, who uses it (grades/ages), and the single most important thing to know about its data practices
+  "keyFindings": string[],      // 3-5 one-sentence findings a parent or school board member most needs to know, most important first. Concrete and specific (name companies, numbers, dates). No hedging filler.
   "layer": "classroom" | "administrative" | "both",   // which data layer(s) the vendor operates in (e.g. a learning app = classroom; an SIS = administrative; PowerSchool = both)
   "summary": {
     "directSubprocessors": number,
@@ -331,8 +333,6 @@ TOOL FAILURE HANDLING — critical:
 
 Output ONLY the JSON object. No markdown fences, no explanation.`;
 
-const USER_AGENT = "Mozilla/5.0 (compatible; VendorAuditBot/1.0)";
-
 async function executeTool(
   name: string,
   input: Record<string, unknown>
@@ -347,7 +347,9 @@ async function executeTool(
     }
 
     if (name === "fetch_page") {
-      return await fetchPageText(input.url as string, 8000, USER_AGENT);
+      const page = await extractPage(input.url as string, 20000);
+      if (page.error) return `Page could not be fetched (${page.error}). Try a different URL.`;
+      return page.text!;
     }
 
 
@@ -365,55 +367,44 @@ async function executeTool(
   }
 }
 
-function vendorQueries(v: string, district?: string): string[] {
-  const q = [
-    `${v} privacy policy`,
-    `${v} subprocessors list`,
-    `${v} data processing agreement`,
-    `${v} trust center`,
-    `${v} App Store privacy`,
-    `${v} Google Play Data Safety`,
-    `${v} AWS Azure Google Cloud infrastructure hosting`,
-    `${v} CDN Cloudflare Fastly Akamai`,
-    `${v} SOC 2 compliance security`,
-    `${v} analytics SDK Firebase Amplitude Mixpanel Segment Heap`,
-    `${v} error tracking Sentry Bugsnag Crashlytics Datadog`,
-    `${v} AI machine learning OpenAI ChatGPT generative AI`,
-    `${v} BuiltWith technology stack`,
-    `${v} engineering blog technology stack`,
-    `${v} job listings software engineer`,
-    `${v} video Vimeo YouTube Kaltura Brightcove Wistia`,
-    `${v} customer support Zendesk Intercom Freshdesk`,
-    `${v} email Twilio SendGrid Mailchimp`,
-    `${v} Clever ClassLink integration`,
-    `${v} Google Classroom Canvas LMS integration`,
-    `${v} PowerSchool Infinite Campus SIS integration`,
-    `${v} student data rostering OneRoster`,
-    `${v} state education data FERPA`,
-    `${v} parent company acquired by acquisition`,
-    `${v} Wikipedia`,
-    `${v} founded year founder CEO`,
-    `${v} lawsuit legal action FTC complaint`,
-    `${v} privacy lawsuit settlement class action`,
-    `${v} FERPA violation`,
-    `${v} data breach security incident`,
-    `${v} investigation student data privacy concerns`,
-    `${v} parents teachers concerns criticism`,
-    `${v} advocacy campaign schools`,
-    `${v} Common Sense privacy evaluation rating`,
-    `${v} independent research effectiveness study`,
-    `${v} pricing per student license cost`,
-    `${v} ESSA Title I Title III IDEA funding eligible`,
-    `${v} contract awarded district state government`,
-    `${v} free premium paid upgrade parents subscription`,
-    `${v} AI features OpenAI generative AI student data retention`,
-    `${v} risk score early warning prediction gradebook integration`,
+function vendorQueries(v: string, district?: string): SearchQuery[] {
+  const q: SearchQuery[] = [
+    // The vendor's own disclosures
+    { query: `${v} privacy policy for students and schools` },
+    { query: `${v} list of subprocessors or third-party service providers` },
+    { query: `${v} data processing agreement or student data privacy agreement` },
+    { query: `${v} trust center security and compliance` },
+    { query: `${v} Student Data Privacy Consortium signed agreement` },
+    { query: `${v} app privacy label on the Apple App Store and Google Play data safety` },
+    // Data flows and technical dependencies
+    { query: `what cloud provider hosts ${v} (AWS, Google Cloud, Azure)` },
+    { query: `analytics and tracking tools used by ${v}` },
+    { query: `${v} integration with Clever, ClassLink, Google Classroom, or Canvas` },
+    { query: `${v} integration with PowerSchool or student information systems, grade passback` },
+    { query: `${v} AI features, which AI provider, and student data` },
+    { query: `${v} risk scores, early warning, or predictive analytics for students` },
+    // Money
+    { query: `${v} pricing per student or district license cost` },
+    { query: `${v} ESSA Title I, Title III, or IDEA funding eligibility` },
+    { query: `${v} contract with school district or state department of education` },
+    { query: `${v} paid premium features or subscriptions for parents` },
+    // Ownership
+    { query: `who owns ${v}, parent company and acquisition history` },
+    { query: `${v} acquired by private equity` },
+    { query: `${v} company history founded founders` },
+    // Legal, controversies, advocacy (news search)
+    { query: `${v} lawsuit or class action over student data`, topic: "news" },
+    { query: `${v} FTC, attorney general, or regulator action`, topic: "news" },
+    { query: `${v} data breach or security incident`, topic: "news" },
+    { query: `${v} investigation or criticism of student privacy`, topic: "news" },
+    { query: `parents or teachers concerns about ${v}`, topic: "news" },
+    { query: `${v} Common Sense privacy evaluation or independent review` },
+    { query: `${v} independent research on effectiveness` },
   ];
   if (district) {
     q.push(
-      `${v} "${district}" contract`,
-      `${v} "${district}" data sharing agreement`,
-      `${v} "${district}" parents concerns news`,
+      { query: `${district} ${v} contract or agreement` },
+      { query: `${district} ${v} parents concerns`, topic: "news" },
     );
   }
   return q;
@@ -429,27 +420,24 @@ export async function runAgent(
     : "";
   const task = `Investigate the edtech vendor/app: "${vendorName}".${districtContext}`;
 
+  assertKeys();
   onProgress(`Starting investigation of "${vendorName}"${districtName ? ` (context: ${districtName})` : ""}…`);
 
   // Step 1 — run every planned search plus the App Store / Exodus lookups in parallel
-  onProgress(`Checking App Store and Exodus Privacy for "${vendorName}"`);
   const [searches, appStore, exodus] = await Promise.all([
     runSearches(vendorQueries(vendorName, districtName), onProgress),
-    lookupAppStore(vendorName).catch((err) => ({ found: false, error: String(err) })),
+    lookupAppStore(vendorName).catch((err) => ({ found: false, error: String(err) } as AppStoreResult)),
     lookupExodus(vendorName).catch((err) => ({ error: String(err) })),
   ]);
 
-  // Step 2 — Claude picks the pages worth reading; fetch them in parallel
+  // Step 2 — always read the vendor's own policy pages, then the pages Claude picks
   onProgress("Choosing which pages to read…");
-  const urls = await selectPagesToFetch(task, searches, 18);
-  const pages = await mapLimit(urls, 8, async (url) => {
-    onProgress(`Fetching: ${url}`);
-    try {
-      return { url, text: await fetchPageText(url, 8000, USER_AGENT) };
-    } catch (err) {
-      return { url, error: `Page could not be fetched (${err instanceof Error ? err.message : String(err)})` };
-    }
-  });
+  const mustRead = [
+    appStore.found ? appStore.privacyUrl : undefined,
+    ...searches.slice(0, 3).map((s) => s.results[0]?.url), // privacy policy, subprocessors, DPA
+  ].filter((u): u is string => !!u);
+  const picked = await selectPagesToFetch(task, searches, 18);
+  const pages = await readPages(Array.from(new Set([...mustRead, ...picked])).slice(0, 20), 20000, onProgress);
 
   // Step 3 — Claude writes the report, with a few turns of follow-up lookups if needed
   onProgress("Analyzing evidence…");

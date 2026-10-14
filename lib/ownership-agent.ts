@@ -1,5 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { runToolLoop } from "./claude-agent";
+import { runToolLoop, assertKeys } from "./claude-agent";
+import { extractPage } from "./extract";
 import { tavilySearch } from "./tavily-search";
 import type { CompanyOwnership } from "./types";
 
@@ -27,7 +28,7 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "fetch_page",
-    description: "Fetch a web page and return its text content. Returns up to 6000 characters.",
+    description: "Fetch a web page and return its text content. Returns the page text.",
     input_schema: {
       type: "object",
       properties: {
@@ -111,13 +112,9 @@ async function executeTool(name: string, input: Record<string, unknown>): Promis
       return JSON.stringify(results, null, 2);
     }
     if (name === "fetch_page") {
-      const res = await fetch(input.url as string, {
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; VendorAuditBot/1.0)" },
-        signal: AbortSignal.timeout(12000),
-      });
-      if (!res.ok) return `Error: HTTP ${res.status}`;
-      const html = await res.text();
-      return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 6000);
+      const page = await extractPage(input.url as string, 15000);
+      if (page.error) return `Page could not be fetched (${page.error}). Try a different URL.`;
+      return page.text!;
     }
     return `Unknown tool: ${name}`;
   } catch (err) {
@@ -132,6 +129,7 @@ export async function runOwnershipAgent(
   companyName: string,
   onProgress: (msg: string) => void,
 ): Promise<CompanyOwnership> {
+  assertKeys();
   onProgress(`Researching ownership of "${companyName}"…`);
 
   const text = await runToolLoop({

@@ -1,5 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { runToolLoop, runSearches, selectPagesToFetch, mapLimit, fetchPageText } from "./claude-agent";
+import { runToolLoop, runSearches, selectPagesToFetch, readPages, assertKeys } from "./claude-agent";
+import { extractPage } from "./extract";
 import { tavilySearch } from "./tavily-search";
 import type { CountyReport } from "./types";
 
@@ -27,7 +28,7 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "fetch_page",
-    description: "Fetch a web page and return its text content. Returns up to 10000 characters.",
+    description: "Fetch a web page and return its text content. Returns the page text.",
     input_schema: {
       type: "object",
       properties: {
@@ -204,8 +205,6 @@ TOOL FAILURE HANDLING — critical:
 
 Output ONLY the JSON object. No markdown fences, no explanation.`;
 
-const USER_AGENT = "Mozilla/5.0 (compatible; EduDataResearchBot/1.0)";
-
 async function executeTool(name: string, input: Record<string, unknown>): Promise<string> {
   try {
     if (name === "search_web") {
@@ -217,7 +216,9 @@ async function executeTool(name: string, input: Record<string, unknown>): Promis
     }
 
     if (name === "fetch_page") {
-      return await fetchPageText(input.url as string, 10000, USER_AGENT);
+      const page = await extractPage(input.url as string, 20000);
+      if (page.error) return `Page could not be fetched (${page.error}). Try a different URL.`;
+      return page.text!;
     }
 
     return `Unknown tool: ${name}`;
@@ -276,6 +277,7 @@ export async function runCountyAgent(
     `Research the state's SLDS/P-20W system, ECIDS, Kindergarten Entry Assessment policy, cross-sector data linkages (workforce/LER, health, justice, military, migration), ` +
     `and applicable data safeguards. Find and verify the vendors and technology companies that built or operate these systems.`;
 
+  assertKeys();
   onProgress(`Starting investigation of ${countyName} County, ${stateName}…`);
 
   // Step 1 — run every planned search in parallel
@@ -288,14 +290,7 @@ export async function runCountyAgent(
   onProgress("Choosing which pages to read…");
   const picked = await selectPagesToFetch(task, searches, 14);
   const urls = Array.from(new Set(["https://nces.ed.gov/programs/slds/stateInfo.asp", ...picked]));
-  const pages = await mapLimit(urls, 8, async (url) => {
-    onProgress(`Fetching: ${url}`);
-    try {
-      return { url, text: await fetchPageText(url, 10000, USER_AGENT) };
-    } catch (err) {
-      return { url, error: `Page could not be fetched (${err instanceof Error ? err.message : String(err)})` };
-    }
-  });
+  const pages = await readPages(urls, 20000, onProgress);
 
   // Step 3 — Claude writes the report, with a few turns of follow-up lookups if needed
   onProgress("Analyzing evidence…");

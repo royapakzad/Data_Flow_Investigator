@@ -23,7 +23,7 @@ function extractSiteFilters(query: string): { query: string; includeDomains: str
   return { query: cleaned || query, includeDomains };
 }
 
-export async function tavilySearch(query: string, count = 5): Promise<SearchResult[]> {
+export async function tavilySearch(query: string, count = 5, topic: "general" | "news" = "general"): Promise<SearchResult[]> {
   const apiKey = process.env.TAVILY_API_KEY;
   if (!apiKey) throw new Error("TAVILY_API_KEY not set");
 
@@ -32,6 +32,7 @@ export async function tavilySearch(query: string, count = 5): Promise<SearchResu
     query: q,
     max_results: Math.min(Math.max(count, 1), 20),
     search_depth: "basic",
+    topic,
     ...(includeDomains.length ? { include_domains: includeDomains } : {}),
   });
 
