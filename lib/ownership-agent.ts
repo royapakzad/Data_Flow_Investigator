@@ -40,6 +40,10 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [
 
 const SYSTEM_PROMPT = `You are a corporate ownership researcher. Given a company name, trace its full ownership chain — from the company itself up through every acquirer to the ultimate parent, especially if that parent is a private equity or investment firm.
 
+Why it matters: in edtech, private equity often runs a "buy-and-build" strategy: acquire a platform company, then roll smaller vendors into it (e.g. Bain Capital → PowerSchool → Schoology, Naviance, Hoonuit, Kickboard; KKR → Instructure → Canvas, Parchment). Student data accumulates with each acquisition while district contracts are rarely renegotiated, so the company holding the data may not be the one the district signed with. Some of these firms also hold government contracts in defense or homeland security. Your readers are parents, teachers, district officials, advocates, and journalists.
+
+When you need several lookups, request them in the same turn so they run in parallel.
+
 RESEARCH PLAN (10-16 tool calls):
 
 1. Search "[company] parent company acquired by" — find who owns it
@@ -51,6 +55,7 @@ RESEARCH PLAN (10-16 tool calls):
 7. If the PE firm has a Wikipedia page, fetch it too for portfolio completeness
 8. Search "[company] acquisitions acquired companies subsidiaries" — what has this company itself bought?
 9. For any company the vendor acquired: search "[company] acquires [subsidiary] [year]" — fetch the announcement URL
+10. In ownershipNotes, note (only if sourced) the purchase price of the most recent deal, whether the ultimate parent also owns other education companies the vendor could share data or services with, and any notable defense/government contracting by the parent.
 
 ANTI-HALLUCINATION RULES:
 - acquisitionHistory: ONLY include events with a verified source URL you actually found. Empty array is correct when none verified.

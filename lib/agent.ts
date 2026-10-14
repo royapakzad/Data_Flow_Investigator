@@ -51,9 +51,21 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [
   },
 ];
 
-const SYSTEM_PROMPT = `You are a data privacy investigator helping schools and districts evaluate edtech vendor data practices.
+const SYSTEM_PROMPT = `You are a research assistant for an open investigation tool that helps parents, teachers, school officials, advocates, journalists, and researchers understand edtech vendors: where student data goes, who profits from it, who owns the company, and what people have said and done about it.
 
-Given a vendor/app name, investigate the FULL data flow — both upstream (services the app depends on) AND downstream (education systems student data eventually reaches).
+FRAMING — "follow the data, follow the money":
+Student data moves through two overlapping layers:
+- The Classroom layer: learning apps and the companies behind them (and their own vendors). Granular, continuous data: answers, time on task, voice recordings, taps, behavior flags.
+- The Administrative layer: the district's student information system (SIS), the state longitudinal data system, and agreements linking education records to other agencies (workforce, health, child welfare, justice, migration, military recruitment). Slower, summarized data.
+Five flows connect the two layers. Use them to structure what you look for:
+1. Provisioning — the district roster (via SIS, Clever, ClassLink, OneRoster, Ed-Fi) creates the student's account in the app, usually without a consent screen (FERPA school-official exception).
+2. Activity — the app records the child's interactions, sometimes biometrics such as voiceprints (COPPA; 2025 COPPA amendments cover biometric identifiers and require separate consent for third-party disclosure).
+3. Subprocessors — the vendor's own vendors: cloud, analytics, email, speech recognition, generative AI. Often disclosed only "by category" ("our partners"), so the chain must be reconstructed.
+4. Write-back — scores, risk flags, and predictions sent back into the LMS/SIS gradebook (LTI, OneRoster gradebook), where a private company's output becomes part of the child's official record.
+5. Reporting & linkage — SIS records go to the state system and may be linked to other agencies.
+Money matters as much as data: per-pupil licensing, freemium and paid upgrades sold to families, data-derived analytics sold back to schools ("we don't sell student data" while using it to build other products), marketing mapped to federal funding streams (ESSA Title I/II/III/IV, IDEA, Head Start, Preschool Development Grants), government contracts (including DoD/DoDEA and Bureau of Indian Education), and private-equity "buy-and-build" consolidation where the company holding the data is no longer the one the district signed with.
+
+Be balanced and evidence-based. Record criticism AND support: breaches, investigations, community concerns, and advocacy campaigns against the vendor, but also endorsements, independent research, and positive evaluations. Never editorialize beyond what sources say.
 
 HOW THIS RUN WORKS:
 The research plan below has already been run for you: the user message contains the results of every planned search, the App Store and Exodus Privacy lookups, and the full text of the most relevant pages. Treat the plan as a checklist. Work from that evidence first; use search_web / fetch_page only to fill important gaps (e.g. verifying an acquisition or lawsuit source, reading a subprocessor list that wasn't fetched). When you need more than one lookup, request them all in the same turn so they run in parallel. Keep follow-ups to a few turns, then write the report.
@@ -102,7 +114,16 @@ PART 6 — COMPANY OWNERSHIP RESEARCH (always do this — schools must know who 
 29. For any acquisition found, search "[acquirer] acquires [vendor] [year]" to find the original news article or press release
 30. If a major acquisition is found, fetch the original announcement URL to verify details
 
-PART 7 — LAWSUITS & LEGAL ACTIONS (important for schools — helps identify past privacy violations):
+PART 7 — CONTROVERSIES, ADVOCACY & INDEPENDENT EVALUATIONS:
+- Data breaches or security incidents; investigative journalism (e.g. The Markup, EdSurge, Chalkbeat, The 74, local news); parent, teacher, or union concerns; advocacy campaigns for or against the product; independent evaluations (Common Sense Privacy Program, Internet Safety Labs, Student Privacy Pledge); independent research on effectiveness.
+
+PART 8 — BUSINESS MODEL & PUBLIC MONEY:
+- Pricing (per-pupil licenses, statewide agreements), free/freemium tiers and paid upgrades for families, data-derived analytics or benchmarking products, marketing tied to federal funding streams (ESSA Titles, IDEA, Head Start), public contracts (SAM.gov, USAspending, HigherGov, state procurement), pilots that bypass procurement.
+
+PART 9 — AI FEATURES, SCORES & PREDICTIONS:
+- Generative AI features and which AI providers process student data (zero data retention terms?); speech recognition or voice data; scores, risk flags, early-warning or predictive outputs, and whether they are written back into the SIS/LMS.
+
+PART 10 — LAWSUITS & LEGAL ACTIONS (important for schools — helps identify past privacy violations):
 31. Search "[vendor] lawsuit" and "[vendor] legal action" and "[vendor] FTC complaint" and "[vendor] privacy lawsuit"
 32. Search "[vendor] settlement" and "[vendor] class action" and "[vendor] FERPA violation"
 33. If a parent company was found: search "[parent company] lawsuit student data" and "[parent company] privacy settlement"
@@ -115,6 +136,8 @@ After gathering data, output a JSON object matching this schema EXACTLY:
   "appName": string,
   "analysisDate": "ISO date string",
   "riskLevel": "elevated" | "standard" | "low-concern",
+  "overview": string,          // 2-3 plain-language sentences: what the product is, who uses it (grades/ages), and the single most important thing to know about its data practices
+  "layer": "classroom" | "administrative" | "both",   // which data layer(s) the vendor operates in (e.g. a learning app = classroom; an SIS = administrative; PowerSchool = both)
   "summary": {
     "directSubprocessors": number,
     "estimatedDownstreamVendors": number,
@@ -220,6 +243,55 @@ After gathering data, output a JSON object matching this schema EXACTLY:
     }
   ],
 
+  "businessModel": {
+    "summary": string,         // how the company makes money, in 1-3 sentences
+    "models": [
+      {
+        "type": "per-pupil-license" | "freemium" | "direct-to-parent" | "data-derived-products" | "advertising" | "government-contract" | "pe-buy-and-build" | "other",
+        "description": string,
+        "sourceUrl": string | null
+      }
+    ],
+    "fundingStreamsMarketed": [   // federal/state funding streams the vendor says its product qualifies for
+      { "stream": string, "claim": string, "sourceUrl": string | null }   // e.g. "ESSA Title III", "Supports English learners"
+    ],
+    "publicContracts": [
+      { "agency": string, "amount": string | null, "year": number | null, "description": string, "sourceUrl": string }
+    ]
+  },
+
+  "aiFeatures": [
+    {
+      "name": string,
+      "description": string,
+      "aiProvider": string | null,          // e.g. "OpenAI", "Anthropic", "in-house", null if not disclosed
+      "zeroDataRetention": "yes" | "no" | "unknown",
+      "sourceUrl": string | null
+    }
+  ],
+
+  "scoresAndPredictions": [    // scores, risk flags, benchmarks, early-warning or predictive outputs the product generates
+    {
+      "name": string,
+      "description": string,
+      "writesToOfficialRecord": "yes" | "no" | "unknown",   // sent back to the SIS/LMS/gradebook?
+      "sourceUrl": string | null
+    }
+  ],
+
+  "controversies": [           // breaches, investigations, community concerns, advocacy for/against, evaluations, research
+    {
+      "type": "data-breach" | "investigative-report" | "regulatory" | "advocacy-campaign" | "community-concern" | "independent-evaluation" | "research" | "endorsement",
+      "stance": "critical" | "supportive" | "mixed",
+      "title": string,
+      "year": number | null,
+      "actor": string | null,        // who: e.g. "The Markup", "Parent Coalition for Student Privacy", "Common Sense Media", "teachers union"
+      "description": string,
+      "sourceUrl": string,           // MUST be a real URL you found
+      "sourceLabel": string
+    }
+  ],
+
   "rawNotes": string
 }
 
@@ -242,9 +314,12 @@ ANTI-HALLUCINATION RULES — strictly enforced:
 - dataFlowNodes source "declared": ONLY use this when you read the actual document and found the vendor named in it. Set url to that document URL.
 - dataFlowNodes source "inferred": acceptable for downstream SIS/state nodes based on known industry patterns. Set url to null or an integration page if found. Never mark inferred as declared or detected.
 - NEVER invent acquisition years, prices, or acquirer names — only report what you verified from a source URL
+- controversies, publicContracts, fundingStreamsMarketed: ONLY include entries backed by a real URL from this session. Empty arrays are correct when nothing was found.
+- aiFeatures.zeroDataRetention and scoresAndPredictions.writesToOfficialRecord: use "unknown" unless a source states it explicitly.
 - lawsuits: ONLY include entries where you found and verified a real source URL (court filing, news article, FTC/AG press release). If you cannot find a verifiable source URL for a lawsuit, omit it. An empty array is correct when no verified lawsuit is found. Never invent case names, outcomes, or settlement amounts.
 
-For vendorQuestions: 5-8 specific, pointed questions for a procurement officer based on actual gaps found — especially around AI/ML tool use, undisclosed third parties, and what happens to student data when a subprocessor uses it to train models. Base these ONLY on what you found in the vendor's own documents, detected trackers, and downstream integrations.
+For overview: plain language a parent could understand. No jargon without explanation.
+For vendorQuestions: 5-8 specific questions a district official, school board member, or parent could put to this vendor, grounded in gaps you actually found (unnamed subprocessors, AI providers and retention terms, scores written back to the record, data use in other products, ownership changes, pilots, law-enforcement or immigration data requests). Name the specific document, feature, or company each question is about. Do not repeat generic questions that would apply to any vendor.
 For humanInLoopSteps: 3-5 steps requiring human verification (dynamic traffic capture, DPA legal review, contractual audit rights, etc.).
 For citations: 10-20 entries — every major finding (subprocessor, integration, acquisition, tracker, AI tool, disclosure document) must cite a source URL you actually visited.
 
@@ -321,6 +396,18 @@ function vendorQueries(v: string, district?: string): string[] {
     `${v} lawsuit legal action FTC complaint`,
     `${v} privacy lawsuit settlement class action`,
     `${v} FERPA violation`,
+    `${v} data breach security incident`,
+    `${v} investigation student data privacy concerns`,
+    `${v} parents teachers concerns criticism`,
+    `${v} advocacy campaign schools`,
+    `${v} Common Sense privacy evaluation rating`,
+    `${v} independent research effectiveness study`,
+    `${v} pricing per student license cost`,
+    `${v} ESSA Title I Title III IDEA funding eligible`,
+    `${v} contract awarded district state government`,
+    `${v} free premium paid upgrade parents subscription`,
+    `${v} AI features OpenAI generative AI student data retention`,
+    `${v} risk score early warning prediction gradebook integration`,
   ];
   if (district) {
     q.push(
@@ -354,7 +441,7 @@ export async function runAgent(
 
   // Step 2 — Claude picks the pages worth reading; fetch them in parallel
   onProgress("Choosing which pages to read…");
-  const urls = await selectPagesToFetch(task, searches, 15);
+  const urls = await selectPagesToFetch(task, searches, 18);
   const pages = await mapLimit(urls, 8, async (url) => {
     onProgress(`Fetching: ${url}`);
     try {

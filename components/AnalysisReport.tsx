@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import type { VendorReport, Citation, Lawsuit, AppMicroscopeData } from "@/lib/types";
+import type { VendorReport, Citation, Lawsuit } from "@/lib/types";
 import { DataFlowDiagram } from "./DataFlowDiagram";
 import { DiscrepancyList } from "./DiscrepancyList";
 import { SubprocessorTable } from "./SubprocessorTable";
 import { CompanyHistory } from "./CompanyHistory";
+import { AtAGlance, BusinessModelView, AIFeaturesView, ScoresView, ControversiesView, QuestionBank, LookItUp } from "./VendorInsights";
 
 interface Props {
   report: VendorReport;
@@ -243,76 +244,6 @@ function LawsuitsList({ lawsuits }: { lawsuits: Lawsuit[] }) {
   );
 }
 
-// ── App Microscope safety label card ─────────────────────────────────────────
-const AM_TIER_STYLES: Record<string, string> = {
-  "Critical Risk": "bg-red-100 border-red-300 text-red-800",
-  "High Risk":     "bg-orange-100 border-orange-300 text-orange-800",
-  "Medium Risk":   "bg-yellow-100 border-yellow-300 text-yellow-800",
-  "Some Risk":     "bg-blue-50 border-blue-300 text-blue-800",
-  "Not Scored":    "bg-slate-100 border-slate-300 text-slate-600",
-};
-
-function AppMicroscopeCard({ data }: { data: AppMicroscopeData }) {
-  if (!data.found) {
-    return (
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 flex items-start gap-4">
-        <div className="shrink-0 w-10 h-10 rounded-lg bg-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs">AM</div>
-        <div className="space-y-2">
-          <p className="font-semibold text-slate-700 text-sm">Not found in App Microscope database</p>
-          <p className="text-xs text-slate-500 leading-relaxed">
-            Check manually — this app may not have been tested yet, or may be listed under a different name.
-          </p>
-          <a href="https://appmicroscope.org/" target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline">
-            Search App Microscope yourself ↗
-          </a>
-        </div>
-      </div>
-    );
-  }
-
-  const tierStyle = data.riskTier ? (AM_TIER_STYLES[data.riskTier] ?? AM_TIER_STYLES["Not Scored"]) : AM_TIER_STYLES["Not Scored"];
-
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="p-5 flex items-start gap-4">
-        <div className="shrink-0 w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs">AM</div>
-        <div className="flex-1 space-y-3">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <p className="font-semibold text-slate-800 text-sm">App Microscope Safety Label</p>
-              <p className="text-xs text-slate-500">Internet Safety Labs — manually tested</p>
-            </div>
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${tierStyle}`}>
-              {data.riskTier ?? "Not Scored"}
-            </span>
-          </div>
-          {data.privacyRisks.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {data.privacyRisks.map((risk, i) => (
-                <span key={i} className="px-2 py-0.5 rounded-full text-xs bg-red-50 border border-red-200 text-red-700">
-                  {risk}
-                </span>
-              ))}
-            </div>
-          )}
-          {data.searchSnippet && (
-            <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 rounded-lg p-3 border border-slate-100">
-              {data.searchSnippet}
-            </p>
-          )}
-          {data.pageUrl && (
-            <a href={data.pageUrl} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline">
-              View on App Microscope ↗
-            </a>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Risk badge ────────────────────────────────────────────────────────────────
 const RISK_STYLES = {
   elevated:      "bg-red-100 text-red-700 border-red-300",
@@ -320,112 +251,101 @@ const RISK_STYLES = {
   "low-concern": "bg-green-100 text-green-700 border-green-300",
 };
 const RISK_LABELS = {
-  elevated:      "⚠ Elevated Concern",
-  standard:      "● Standard Risk",
-  "low-concern": "✓ Low Concern",
+  elevated:      "Elevated concern",
+  standard:      "Standard risk",
+  "low-concern": "Lower concern",
 };
+
+// ── Section nav ───────────────────────────────────────────────────────────────
+function SectionNav({ items }: { items: { id: string; label: string }[] }) {
+  return (
+    <nav className="sticky top-0 z-30 -mx-4 px-4 py-2 bg-white/90 backdrop-blur border-b border-slate-200 no-print">
+      <div className="flex gap-1 overflow-x-auto scrollbar-none">
+        {items.map((it) => (
+          <a key={it.id} href={`#${it.id}`}
+            className="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors">
+            {it.label}
+          </a>
+        ))}
+      </div>
+    </nav>
+  );
+}
 
 export function AnalysisReport({ report }: Props) {
   const docs = report.privacyDocuments;
   const citations = report.citations ?? [];
   const getCite = useCiteByUrl(citations);
+  const hasDocs = !!(docs.privacyPolicyUrl || docs.dpaUrl || docs.subprocessorListUrl || docs.appStoreUrl || docs.playStoreUrl);
+  const name = report.appName || report.vendorName;
+
+  const nav = [
+    { id: "data-flow", label: "Data flow", show: report.dataFlowNodes?.length > 0 },
+    { id: "subprocessors", label: "Subprocessors", show: report.subprocessors?.length > 0 },
+    { id: "ai", label: "AI & predictions", show: true },
+    { id: "discrepancies", label: "Discrepancies", show: true },
+    { id: "money", label: "Follow the money", show: true },
+    { id: "ownership", label: "Ownership", show: !!report.companyOwnership },
+    { id: "lawsuits", label: "Lawsuits", show: true },
+    { id: "controversies", label: "Controversies & advocacy", show: true },
+    { id: "questions", label: "Questions", show: true },
+    { id: "lookups", label: "Look it up", show: true },
+    { id: "citations", label: "Sources", show: citations.length > 0 },
+  ].filter((n) => n.show);
 
   return (
     <div className="space-y-10">
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">{report.vendorName}</h1>
-          {report.appName !== report.vendorName && (
-            <p className="text-slate-500 text-sm mt-1">App: {report.appName}</p>
-          )}
-          <p className="text-xs text-slate-400 mt-1">
-            Analysis date: {new Date(report.analysisDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
-          </p>
+      <div className="space-y-4">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">{report.vendorName}</h1>
+            {report.appName && report.appName !== report.vendorName && (
+              <p className="text-slate-500 text-sm mt-1">App: {report.appName}</p>
+            )}
+            <p className="text-xs text-slate-400 mt-1">
+              Researched {new Date(report.analysisDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} from public sources
+            </p>
+          </div>
+          <span className={`px-4 py-2 rounded-full text-sm font-semibold border ${RISK_STYLES[report.riskLevel]}`}>
+            {RISK_LABELS[report.riskLevel]}
+          </span>
         </div>
-        <span className={`px-4 py-2 rounded-full text-sm font-semibold border ${RISK_STYLES[report.riskLevel]}`}>
-          {RISK_LABELS[report.riskLevel]}
-        </span>
+        <AtAGlance report={report} />
+        {hasDocs && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400 mr-1">Read the originals</span>
+            {docs.privacyPolicyUrl    && <DocPill href={docs.privacyPolicyUrl}    label="Privacy policy"            cite={getCite(docs.privacyPolicyUrl)} />}
+            {docs.dpaUrl              && <DocPill href={docs.dpaUrl}              label="Data processing agreement" cite={getCite(docs.dpaUrl)} />}
+            {docs.subprocessorListUrl && <DocPill href={docs.subprocessorListUrl} label="Subprocessor list"         cite={getCite(docs.subprocessorListUrl)} />}
+            {docs.appStoreUrl         && <DocPill href={docs.appStoreUrl}         label="App Store"                 cite={getCite(docs.appStoreUrl)} />}
+            {docs.playStoreUrl        && <DocPill href={docs.playStoreUrl}        label="Play Store"                cite={getCite(docs.playStoreUrl)} />}
+            {docs.lastUpdated && <span className="text-xs text-slate-400">Policy updated {docs.lastUpdated}</span>}
+          </div>
+        )}
       </div>
 
-      {/* ── Company Ownership ──────────────────────────────────────────── */}
-      {report.companyOwnership && (
-        <Section title="Company Ownership & Acquisition History"
-          subtitle="Who ultimately controls this product and its data.">
-          <CompanyHistory ownership={report.companyOwnership} />
-        </Section>
-      )}
+      <SectionNav items={nav} />
 
-      {/* ── Lawsuits & Legal Actions ───────────────────────────────────── */}
-      <Section title="Lawsuits & Legal Actions"
-        subtitle="Known lawsuits, regulatory actions, or settlements against the company or its parent. Empty means none were found in public sources — not a guarantee none exist.">
-        {report.lawsuits && report.lawsuits.length > 0 ? (
-          <LawsuitsList lawsuits={report.lawsuits} />
-        ) : (
-          <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-green-700 text-sm">
-            No lawsuits or regulatory actions found in public sources during this analysis. Verify independently before relying on this finding.
-          </div>
-        )}
-      </Section>
-
-      {/* ── App Microscope ─────────────────────────────────────────────── */}
-      <Section title="App Microscope Safety Label"
-        subtitle="Internet Safety Labs manually tests mobile apps for privacy risks. This label reflects their independent assessment — separate from what the vendor self-discloses.">
-        {report.appMicroscope ? (
-          <AppMicroscopeCard data={report.appMicroscope} />
-        ) : (
-          <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 text-slate-500 text-sm">
-            App Microscope was not checked during this analysis. Re-run to include it.
-          </div>
-        )}
-      </Section>
-
-      {/* ── Source Documents ───────────────────────────────────────────── */}
-      {(docs.privacyPolicyUrl || docs.dpaUrl || docs.subprocessorListUrl || docs.appStoreUrl || docs.playStoreUrl) && (
-        <Section title="Primary Source Documents"
-          subtitle="Official documents reviewed for this analysis. Click to read the originals.">
-          <div className="flex flex-wrap gap-3">
-            {docs.privacyPolicyUrl   && <DocPill href={docs.privacyPolicyUrl}   label="Privacy Policy"               cite={getCite(docs.privacyPolicyUrl)} />}
-            {docs.dpaUrl             && <DocPill href={docs.dpaUrl}             label="Data Processing Agreement"    cite={getCite(docs.dpaUrl)} />}
-            {docs.subprocessorListUrl && <DocPill href={docs.subprocessorListUrl} label="Subprocessor List"          cite={getCite(docs.subprocessorListUrl)} />}
-            {docs.appStoreUrl        && <DocPill href={docs.appStoreUrl}        label="App Store"                    cite={getCite(docs.appStoreUrl)} />}
-            {docs.playStoreUrl       && <DocPill href={docs.playStoreUrl}       label="Play Store"                   cite={getCite(docs.playStoreUrl)} />}
-          </div>
-          {docs.lastUpdated && (
-            <p className="text-xs text-slate-500 mt-2">Privacy policy last updated: {docs.lastUpdated}</p>
-          )}
-        </Section>
-      )}
-
-      {/* ── Data Flow ──────────────────────────────────────────────────── */}
+      {/* ── FOLLOW THE DATA ────────────────────────────────────────────── */}
       {report.dataFlowNodes?.length > 0 && (
-        <Section
-          title="Data Flow — Full Chain"
-          subtitle="Where student data goes: upstream services the app relies on, the app itself, and downstream education systems it connects to. Each node links to the company's privacy page. Hover [N] to see the source."
-        >
+        <Section id="data-flow" title="Where student data goes"
+          subtitle="Services the app relies on (its own vendors), the app itself, and the school and state systems it connects to. Hover [N] to see the source.">
           <DataFlowDiagram nodes={report.dataFlowNodes} citations={citations} />
         </Section>
       )}
 
-      {/* ── Discrepancies ──────────────────────────────────────────────── */}
-      <Section title="Discrepancies Between Declared & Detected Practices"
-        subtitle="Gaps found between what the vendor claims and what was actually detected.">
-        <DiscrepancyList report={report} />
-      </Section>
-
-      {/* ── Subprocessors table ────────────────────────────────────────── */}
       {report.subprocessors?.length > 0 && (
-        <Section title="Subprocessors"
-          subtitle="Third parties with access to student data, as declared or detected. Names link to their privacy pages.">
+        <Section id="subprocessors" title="Subprocessors: the vendor's own vendors"
+          subtitle="Third parties that handle student data, as declared by the vendor, detected in the app, or inferred. Vendors are allowed to name these only by category, so this list is reconstructed.">
           <SubprocessorTable report={report} citations={citations} />
         </Section>
       )}
 
-      {/* ── Trackers ───────────────────────────────────────────────────── */}
       {report.trackers?.length > 0 && (
-        <Section title="Trackers Detected via Exodus Privacy"
-          subtitle="SDKs found in the Android app that were not declared in privacy documentation.">
+        <Section id="trackers" title="Trackers in the Android app"
+          subtitle="SDKs detected by Exodus Privacy.">
           <div className="flex flex-wrap gap-2">
             {report.trackers.map((t, i) => (
               <div key={i} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-50 border border-red-200">
@@ -443,35 +363,77 @@ export function AnalysisReport({ report }: Props) {
         </Section>
       )}
 
-      {/* ── Vendor Questions ───────────────────────────────────────────── */}
-      <Section title="Questions to Ask the Vendor"
-        subtitle="Specific questions for procurement or legal review based on gaps found in this analysis.">
-        <EditableQuestions initialQuestions={report.vendorQuestions} />
-      </Section>
-
-      {/* ── Human-in-loop ──────────────────────────────────────────────── */}
-      <Section title="Steps Requiring Human Verification"
-        subtitle="Things this automated analysis cannot do — requiring a qualified human reviewer.">
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-          <div className="h-1 bg-amber-400" />
-          <div className="p-5 space-y-3">
-          {report.humanInLoopSteps.map((step, i) => (
-            <div key={i} className="flex gap-3 text-sm text-slate-700">
-              <span className="text-amber-500 font-bold shrink-0 mt-0.5">→</span>
-              <p className="leading-relaxed">{step}</p>
-            </div>
-          ))}
-          </div>
+      <Section id="ai" title="AI features, scores & predictions"
+        subtitle="Generative AI providers that may process student data, and scores or risk flags that can become part of a child's official record.">
+        <div className="space-y-6">
+          <AIFeaturesView features={report.aiFeatures} />
+          <ScoresView items={report.scoresAndPredictions} />
         </div>
       </Section>
 
-      {/* ── Citations ──────────────────────────────────────────────────── */}
+      <Section id="discrepancies" title="What they say vs. what was found"
+        subtitle="Gaps between the vendor's disclosures and what was detected or reported elsewhere.">
+        <DiscrepancyList report={report} />
+      </Section>
+
+      {/* ── FOLLOW THE MONEY ───────────────────────────────────────────── */}
+      <Section id="money" title="Follow the money"
+        subtitle="How the company makes money: licensing, paid upgrades for families, data-derived products, public funding it's marketed against, and public contracts.">
+        <BusinessModelView model={report.businessModel} />
+      </Section>
+
+      {report.companyOwnership && (
+        <Section id="ownership" title="Who owns it"
+          subtitle="The company that holds the data today may not be the one the district signed with. Use the Ownership tab for the full private-equity portfolio.">
+          <CompanyHistory ownership={report.companyOwnership} />
+        </Section>
+      )}
+
+      <Section id="lawsuits" title="Lawsuits & legal actions"
+        subtitle="Lawsuits, regulatory actions, or settlements involving the company or its parent.">
+        {report.lawsuits && report.lawsuits.length > 0 ? (
+          <LawsuitsList lawsuits={report.lawsuits} />
+        ) : (
+          <p className="rounded-xl bg-slate-50 border border-slate-200 p-4 text-sm text-slate-500">
+            None found in public sources during this search. That isn&apos;t proof none exist.
+          </p>
+        )}
+      </Section>
+
+      <Section id="controversies" title="Controversies & advocacy"
+        subtitle="Breaches, investigations, community concerns, and campaigns for and against, plus independent evaluations and research.">
+        <ControversiesView items={report.controversies} />
+      </Section>
+
+      {/* ── TAKE ACTION ────────────────────────────────────────────────── */}
+      <Section id="questions" title="Questions to ask"
+        subtitle="Questions based on gaps found for this vendor. You can edit them before sharing.">
+        <div className="space-y-5">
+          <EditableQuestions initialQuestions={report.vendorQuestions} />
+          <QuestionBank />
+        </div>
+      </Section>
+
+      <Section title="What still needs a human"
+        subtitle="Things this automated research can't do.">
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 space-y-3">
+          {report.humanInLoopSteps.map((step, i) => (
+            <div key={i} className="flex gap-3 text-sm text-slate-700">
+              <span className="text-amber-500 font-bold shrink-0">→</span>
+              <p className="leading-relaxed">{step}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section id="lookups" title="Look it up yourself"
+        subtitle="Independent sources not included in this automated research.">
+        <LookItUp name={name} />
+      </Section>
+
       {citations.length > 0 && (
-        <Section
-          id="citations"
-          title="Sources & Citations"
-          subtitle="Every claim in this report is backed by a source listed here. Click any [N] badge above to jump to its source."
-        >
+        <Section id="citations" title="Sources"
+          subtitle="Every finding above links back to one of these. Click any [N] badge to jump here.">
           <CitationsList citations={citations} />
         </Section>
       )}

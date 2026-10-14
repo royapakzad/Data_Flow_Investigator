@@ -218,6 +218,7 @@ const SECTOR_META: Record<string, { topBar: string; badge: string; icon: string;
   health:          { topBar: "bg-pink-500",   badge: "bg-pink-100 text-pink-800 border-pink-200",       icon: "🏥", nameColor: "text-pink-800" },
   justice:         { topBar: "bg-slate-600",  badge: "bg-slate-100 text-slate-800 border-slate-300",    icon: "⚖️", nameColor: "text-slate-800" },
   military:        { topBar: "bg-blue-700",   badge: "bg-blue-100 text-blue-800 border-blue-200",       icon: "🎖️", nameColor: "text-blue-800" },
+  "child-welfare": { topBar: "bg-orange-500", badge: "bg-orange-100 text-orange-800 border-orange-200", icon: "🏠", nameColor: "text-orange-800" },
   migration:       { topBar: "bg-green-600",  badge: "bg-green-100 text-green-800 border-green-200",    icon: "🌍", nameColor: "text-green-800" },
   other:           { topBar: "bg-cyan-500",   badge: "bg-cyan-100 text-cyan-800 border-cyan-200",       icon: "🔗", nameColor: "text-cyan-800" },
 };

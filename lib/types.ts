@@ -115,6 +115,47 @@ export interface Lawsuit {
   sourceLabel: string;
 }
 
+// ── Business model, AI, predictions, controversies ───────────────────────────
+
+export type VendorLayer = "classroom" | "administrative" | "both";
+
+export interface BusinessModel {
+  summary: string;
+  models: {
+    type: "per-pupil-license" | "freemium" | "direct-to-parent" | "data-derived-products" | "advertising" | "government-contract" | "pe-buy-and-build" | "other";
+    description: string;
+    sourceUrl: string | null;
+  }[];
+  fundingStreamsMarketed: { stream: string; claim: string; sourceUrl: string | null }[];
+  publicContracts: { agency: string; amount: string | null; year: number | null; description: string; sourceUrl: string }[];
+}
+
+export interface AIFeature {
+  name: string;
+  description: string;
+  aiProvider: string | null;
+  zeroDataRetention: "yes" | "no" | "unknown";
+  sourceUrl: string | null;
+}
+
+export interface ScoreOrPrediction {
+  name: string;
+  description: string;
+  writesToOfficialRecord: "yes" | "no" | "unknown";
+  sourceUrl: string | null;
+}
+
+export interface Controversy {
+  type: "data-breach" | "investigative-report" | "regulatory" | "advocacy-campaign" | "community-concern" | "independent-evaluation" | "research" | "endorsement";
+  stance: "critical" | "supportive" | "mixed";
+  title: string;
+  year: number | null;
+  actor: string | null;
+  description: string;
+  sourceUrl: string;
+  sourceLabel: string;
+}
+
 // ── Reddit Posts ──────────────────────────────────────────────────────────────
 
 export interface RedditPost {
@@ -137,6 +178,8 @@ export interface VendorReport {
   appName: string;
   analysisDate: string;
   riskLevel: RiskLevel;
+  overview?: string;
+  layer?: VendorLayer;
   summary: {
     directSubprocessors: number;
     estimatedDownstreamVendors: number;
@@ -163,6 +206,11 @@ export interface VendorReport {
   diagramCode?: string;   // built programmatically from dataFlowNodes
   sources?: Source[];
   rawNotes?: string;
+  // Older shared reports predate these fields
+  businessModel?: BusinessModel;
+  aiFeatures?: AIFeature[];
+  scoresAndPredictions?: ScoreOrPrediction[];
+  controversies?: Controversy[];
 }
 
 export interface AnalyzeRequest {
@@ -196,7 +244,7 @@ export interface EduDataSystem {
   source: "declared" | "inferred";
 }
 
-export type CrossSectorType = "workforce-LER" | "health" | "justice" | "military" | "migration" | "other";
+export type CrossSectorType = "workforce-LER" | "health" | "justice" | "military" | "migration" | "child-welfare" | "other";
 
 export interface CrossSectorLinkage {
   sector: CrossSectorType;

@@ -16,9 +16,9 @@ const SEVERITY_BADGE = {
 export function DiscrepancyList({ report }: { report: VendorReport }) {
   if (report.discrepancies.length === 0) {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-green-700 text-sm">
-        No discrepancies detected between declared and identified data practices.
-      </div>
+      <p className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-slate-500 text-sm">
+        No gaps found between what the vendor discloses and what was detected. Automated checks can&apos;t see network traffic, so this isn&apos;t a clean bill of health.
+      </p>
     );
   }
 
