@@ -1,23 +1,7 @@
-import { GoogleGenerativeAI, SchemaType, FunctionCallingMode, type FunctionDeclaration } from "@google/generative-ai";
-import { braveSearch } from "./brave-search";
+import type Anthropic from "@anthropic-ai/sdk";
+import { runToolLoop } from "./claude-agent";
+import { tavilySearch } from "./tavily-search";
 import type { CompanyOwnership } from "./types";
-
-const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 3, baseMs = 2000): Promise<T> {
-  let lastErr: unknown;
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try { return await fn(); } catch (err) {
-      lastErr = err;
-      if (attempt < maxAttempts - 1) await sleep(baseMs * Math.pow(2, attempt));
-    }
-  }
-  throw lastErr;
-}
 
 function extractJSON(text: string): string {
   const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
@@ -28,15 +12,15 @@ function extractJSON(text: string): string {
   return text.trim();
 }
 
-const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
+const TOOLS: Anthropic.Beta.BetaTool[] = [
   {
     name: "search_web",
     description: "Search the web for information.",
-    parameters: {
-      type: SchemaType.OBJECT,
+    input_schema: {
+      type: "object",
       properties: {
-        query: { type: SchemaType.STRING, description: "Search query" },
-        count: { type: SchemaType.NUMBER, description: "Number of results (1-10, default 5)" },
+        query: { type: "string", description: "Search query" },
+        count: { type: "number", description: "Number of results (1-10, default 5)" },
       },
       required: ["query"],
     },
@@ -44,10 +28,10 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: "fetch_page",
     description: "Fetch a web page and return its text content. Returns up to 6000 characters.",
-    parameters: {
-      type: SchemaType.OBJECT,
+    input_schema: {
+      type: "object",
       properties: {
-        url: { type: SchemaType.STRING, description: "URL to fetch" },
+        url: { type: "string", description: "URL to fetch" },
       },
       required: ["url"],
     },
@@ -118,7 +102,7 @@ Output ONLY this JSON object — no markdown, no explanation:
 async function executeTool(name: string, input: Record<string, unknown>): Promise<string> {
   try {
     if (name === "search_web") {
-      const results = await braveSearch(input.query as string, (input.count as number) ?? 5);
+      const results = await tavilySearch(input.query as string, (input.count as number) ?? 5);
       return JSON.stringify(results, null, 2);
     }
     if (name === "fetch_page") {
@@ -143,54 +127,27 @@ export async function runOwnershipAgent(
   companyName: string,
   onProgress: (msg: string) => void,
 ): Promise<CompanyOwnership> {
-  const model = client.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    systemInstruction: SYSTEM_PROMPT,
-    tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
-    toolConfig: { functionCallingConfig: { mode: FunctionCallingMode.AUTO } },
-    generationConfig: { maxOutputTokens: 8000 },
-  });
-
-  const chat = model.startChat();
   onProgress(`Researching ownership of "${companyName}"…`);
 
-  let result = await withRetry(() =>
-    chat.sendMessage(`Research the full ownership chain for: "${companyName}". Trace up to the ultimate parent (especially private equity). Find what this company has acquired. Output the JSON.`)
-  );
+  const text = await runToolLoop({
+    system: SYSTEM_PROMPT,
+    tools: TOOLS,
+    userMessage: `Research the full ownership chain for: "${companyName}". Trace up to the ultimate parent (especially private equity). Find what this company has acquired. Output the JSON.`,
+    maxIterations: 25,
+    effort: "low",
+    executeTool,
+    describeCall: (step, name, args) =>
+      name === "search_web" ? `[${step}] Searching: "${args.query}"` : `[${step}] Fetching: ${args.url}`,
+    onProgress,
+  });
 
-  const MAX_ITERATIONS = 25;
-  let stepCount = 0;
-
-  for (let i = 0; i < MAX_ITERATIONS; i++) {
-    const response = result.response;
-    const functionCalls = response.functionCalls();
-
-    if (!functionCalls?.length) {
-      onProgress("Building ownership graph…");
-      const jsonStr = extractJSON(response.text());
-      const ownership = JSON.parse(jsonStr) as CompanyOwnership;
-      // Ensure required array fields exist
-      ownership.acquisitionHistory = ownership.acquisitionHistory ?? [];
-      ownership.pePortfolioCompanies = ownership.pePortfolioCompanies ?? [];
-      ownership.vendorAcquisitions = ownership.vendorAcquisitions ?? [];
-      ownership.founders = ownership.founders ?? [];
-      ownership.isPEOwned = ownership.isPEOwned ?? false;
-      return ownership;
-    }
-
-    const toolResponses: Array<{ functionResponse: { name: string; response: { result: string } } }> = [];
-    for (const call of functionCalls) {
-      stepCount++;
-      const args = call.args as Record<string, unknown>;
-      const msg = call.name === "search_web"
-        ? `[${stepCount}] Searching: "${args.query}"`
-        : `[${stepCount}] Fetching: ${args.url}`;
-      onProgress(msg);
-      const output = await executeTool(call.name, call.args as Record<string, unknown>);
-      toolResponses.push({ functionResponse: { name: call.name, response: { result: output } } });
-    }
-    result = await withRetry(() => chat.sendMessage(toolResponses));
-  }
-
-  throw new Error("Ownership agent exceeded maximum iterations");
+  onProgress("Building ownership graph…");
+  const ownership = JSON.parse(extractJSON(text)) as CompanyOwnership;
+  // Ensure required array fields exist
+  ownership.acquisitionHistory = ownership.acquisitionHistory ?? [];
+  ownership.pePortfolioCompanies = ownership.pePortfolioCompanies ?? [];
+  ownership.vendorAcquisitions = ownership.vendorAcquisitions ?? [];
+  ownership.founders = ownership.founders ?? [];
+  ownership.isPEOwned = ownership.isPEOwned ?? false;
+  return ownership;
 }

@@ -1,31 +1,12 @@
-import { GoogleGenerativeAI, SchemaType, FunctionCallingMode, type FunctionDeclaration } from "@google/generative-ai";
-import { braveSearch } from "./brave-search";
+import type Anthropic from "@anthropic-ai/sdk";
+import { runToolLoop, runSearches, selectPagesToFetch, mapLimit, fetchPageText } from "./claude-agent";
+import { tavilySearch } from "./tavily-search";
 import { lookupExodus } from "./exodus";
 import { lookupAppStore } from "./appstore";
 import { buildMermaidDiagram } from "./diagram";
 import type { VendorReport } from "./types";
 
-const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
 // ── Shared utilities ──────────────────────────────────────────────────────────
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// Retry a fn up to maxAttempts times with exponential backoff on any error.
-async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 3, baseMs = 3000): Promise<T> {
-  let lastErr: unknown;
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastErr = err;
-      if (attempt < maxAttempts - 1) await sleep(baseMs * Math.pow(2, attempt));
-    }
-  }
-  throw lastErr;
-}
 
 // Extract the outermost JSON object from a model response that may contain
 // markdown fences, preamble text, or trailing explanation.
@@ -42,16 +23,16 @@ function extractJSON(text: string): string {
   return text.trim();
 }
 
-const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
+const TOOLS: Anthropic.Beta.BetaTool[] = [
   {
     name: "search_web",
     description:
       "Search the web for information. Use targeted queries like 'ClassDojo privacy policy site:classdojo.com' or 'ClassDojo subprocessor list'.",
-    parameters: {
-      type: SchemaType.OBJECT,
+    input_schema: {
+      type: "object",
       properties: {
-        query: { type: SchemaType.STRING, description: "Search query" },
-        count: { type: SchemaType.NUMBER, description: "Number of results (1-10, default 5)" },
+        query: { type: "string", description: "Search query" },
+        count: { type: "number", description: "Number of results (1-10, default 5)" },
       },
       required: ["query"],
     },
@@ -60,36 +41,12 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
     name: "fetch_page",
     description:
       "Fetch a web page and return its text content. Use for privacy policies, DPAs, subprocessor lists. Returns up to 8000 characters.",
-    parameters: {
-      type: SchemaType.OBJECT,
+    input_schema: {
+      type: "object",
       properties: {
-        url: { type: SchemaType.STRING, description: "URL to fetch" },
+        url: { type: "string", description: "URL to fetch" },
       },
       required: ["url"],
-    },
-  },
-  {
-    name: "lookup_exodus",
-    description:
-      "Look up an Android app on Exodus Privacy to get detected trackers and permissions. Pass the app name or package name.",
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        appName: { type: SchemaType.STRING, description: "App name or Android package name" },
-      },
-      required: ["appName"],
-    },
-  },
-  {
-    name: "lookup_appstore",
-    description:
-      "Look up an app on the Apple App Store via iTunes Search API. Returns app metadata including privacy policy URL.",
-    parameters: {
-      type: SchemaType.OBJECT,
-      properties: {
-        appName: { type: SchemaType.STRING, description: "App name to search for" },
-      },
-      required: ["appName"],
     },
   },
 ];
@@ -98,16 +55,19 @@ const SYSTEM_PROMPT = `You are a data privacy investigator helping schools and d
 
 Given a vendor/app name, investigate the FULL data flow — both upstream (services the app depends on) AND downstream (education systems student data eventually reaches).
 
-RESEARCH PLAN (22-32 tool calls):
+HOW THIS RUN WORKS:
+The research plan below has already been run for you: the user message contains the results of every planned search, the App Store and Exodus Privacy lookups, and the full text of the most relevant pages. Treat the plan as a checklist. Work from that evidence first; use search_web / fetch_page only to fill important gaps (e.g. verifying an acquisition or lawsuit source, reading a subprocessor list that wasn't fetched). When you need more than one lookup, request them all in the same turn so they run in parallel. Keep follow-ups to a few turns, then write the report.
+
+RESEARCH PLAN:
 
 PART 1 — OFFICIAL THIRD-PARTY DISCLOSURE DOCUMENTS (start here — these are ground truth):
 1. Search "[vendor] privacy policy" — fetch the privacy policy page, note all third parties mentioned
 2. Search "[vendor] subprocessors list" OR "[vendor] data processing agreement" — fetch if found
 3. Search "[vendor] trust center" OR "trust.[vendor].com" OR "[vendor].com/trust" — fetch if found
 4. Search "[vendor] App Store privacy" — fetch the App Store page (shows Apple's privacy nutrition label: data linked to you, data used to track you)
-5. Check App Store via lookup_appstore — get the privacyPolicyUrl and declared data practices
+5. App Store lookup (provided) — get the privacyPolicyUrl and declared data practices
 6. Search "[vendor] Google Play Data Safety" — fetch the Play Store page (shows Data Safety section with declared data types and sharing)
-7. Check Exodus Privacy via lookup_exodus — get detected SDK trackers and permissions
+7. Exodus Privacy lookup (provided) — get detected SDK trackers and permissions
 
 PART 2 — INFRASTRUCTURE & HOSTING:
 8. Search "[vendor] AWS Azure Google Cloud infrastructure hosting" — identify cloud provider
@@ -283,9 +243,8 @@ ANTI-HALLUCINATION RULES — strictly enforced:
 - dataFlowNodes source "inferred": acceptable for downstream SIS/state nodes based on known industry patterns. Set url to null or an integration page if found. Never mark inferred as declared or detected.
 - NEVER invent acquisition years, prices, or acquirer names — only report what you verified from a source URL
 - lawsuits: ONLY include entries where you found and verified a real source URL (court filing, news article, FTC/AG press release). If you cannot find a verifiable source URL for a lawsuit, omit it. An empty array is correct when no verified lawsuit is found. Never invent case names, outcomes, or settlement amounts.
-- appMicroscope: ONLY copy the exact values returned by lookup_appmicroscope. If found is false, set found: false and leave riskTier: null, privacyRisks: [], searchSnippet: null. NEVER infer, guess, or fabricate a risk tier or privacy risks.
 
-For vendorQuestions: 5-8 specific, pointed questions for a procurement officer based on actual gaps found — especially around AI/ML tool use, undisclosed third parties, and what happens to student data when a subprocessor uses it to train models. Base these ONLY on what you found in the vendor's own documents, detected trackers, and downstream integrations. Do NOT base any question on the App Microscope result.
+For vendorQuestions: 5-8 specific, pointed questions for a procurement officer based on actual gaps found — especially around AI/ML tool use, undisclosed third parties, and what happens to student data when a subprocessor uses it to train models. Base these ONLY on what you found in the vendor's own documents, detected trackers, and downstream integrations.
 For humanInLoopSteps: 3-5 steps requiring human verification (dynamic traffic capture, DPA legal review, contractual audit rights, etc.).
 For citations: 10-20 entries — every major finding (subprocessor, integration, acquisition, tracker, AI tool, disclosure document) must cite a source URL you actually visited.
 
@@ -297,13 +256,15 @@ TOOL FAILURE HANDLING — critical:
 
 Output ONLY the JSON object. No markdown fences, no explanation.`;
 
+const USER_AGENT = "Mozilla/5.0 (compatible; VendorAuditBot/1.0)";
+
 async function executeTool(
   name: string,
   input: Record<string, unknown>
 ): Promise<string> {
   try {
     if (name === "search_web") {
-      const results = await braveSearch(
+      const results = await tavilySearch(
         input.query as string,
         (input.count as number) ?? 5
       );
@@ -311,25 +272,9 @@ async function executeTool(
     }
 
     if (name === "fetch_page") {
-      const res = await fetch(input.url as string, {
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; VendorAuditBot/1.0)" },
-        signal: AbortSignal.timeout(15000),
-      });
-      if (!res.ok) return `Error: HTTP ${res.status}`;
-      const text = await res.text();
-      const cleaned = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-      return cleaned.slice(0, 8000);
+      return await fetchPageText(input.url as string, 8000, USER_AGENT);
     }
 
-    if (name === "lookup_exodus") {
-      const result = await lookupExodus(input.appName as string);
-      return JSON.stringify(result, null, 2);
-    }
-
-    if (name === "lookup_appstore") {
-      const result = await lookupAppStore(input.appName as string);
-      return JSON.stringify(result, null, 2);
-    }
 
     return `Unknown tool: ${name}`;
   } catch (err) {
@@ -345,68 +290,103 @@ async function executeTool(
   }
 }
 
+function vendorQueries(v: string, district?: string): string[] {
+  const q = [
+    `${v} privacy policy`,
+    `${v} subprocessors list`,
+    `${v} data processing agreement`,
+    `${v} trust center`,
+    `${v} App Store privacy`,
+    `${v} Google Play Data Safety`,
+    `${v} AWS Azure Google Cloud infrastructure hosting`,
+    `${v} CDN Cloudflare Fastly Akamai`,
+    `${v} SOC 2 compliance security`,
+    `${v} analytics SDK Firebase Amplitude Mixpanel Segment Heap`,
+    `${v} error tracking Sentry Bugsnag Crashlytics Datadog`,
+    `${v} AI machine learning OpenAI ChatGPT generative AI`,
+    `${v} BuiltWith technology stack`,
+    `${v} engineering blog technology stack`,
+    `${v} job listings software engineer`,
+    `${v} video Vimeo YouTube Kaltura Brightcove Wistia`,
+    `${v} customer support Zendesk Intercom Freshdesk`,
+    `${v} email Twilio SendGrid Mailchimp`,
+    `${v} Clever ClassLink integration`,
+    `${v} Google Classroom Canvas LMS integration`,
+    `${v} PowerSchool Infinite Campus SIS integration`,
+    `${v} student data rostering OneRoster`,
+    `${v} state education data FERPA`,
+    `${v} parent company acquired by acquisition`,
+    `${v} Wikipedia`,
+    `${v} founded year founder CEO`,
+    `${v} lawsuit legal action FTC complaint`,
+    `${v} privacy lawsuit settlement class action`,
+    `${v} FERPA violation`,
+  ];
+  if (district) {
+    q.push(
+      `${v} "${district}" contract`,
+      `${v} "${district}" data sharing agreement`,
+      `${v} "${district}" parents concerns news`,
+    );
+  }
+  return q;
+}
+
 export async function runAgent(
   vendorName: string,
   onProgress: (msg: string) => void,
   districtName?: string,
 ): Promise<VendorReport> {
-  const model = client.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    systemInstruction: SYSTEM_PROMPT,
-    tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
-    toolConfig: { functionCallingConfig: { mode: FunctionCallingMode.AUTO } },
-    generationConfig: { maxOutputTokens: 20000 },
-  });
-
-  const chat = model.startChat();
   const districtContext = districtName
     ? ` Also investigate the vendor's specific relationship with "${districtName}" school district: search for contracts, data sharing agreements, local news coverage, community or parent concerns, and any district-specific implementation details. Include district-specific findings in the report summary and discrepancies where relevant.`
     : "";
+  const task = `Investigate the edtech vendor/app: "${vendorName}".${districtContext}`;
 
   onProgress(`Starting investigation of "${vendorName}"${districtName ? ` (context: ${districtName})` : ""}…`);
 
-  let result = await withRetry(() =>
-    chat.sendMessage(
-      `Investigate the edtech vendor/app: "${vendorName}".${districtContext} Gather all available public information about their data practices and output the JSON report.`
-    )
-  );
+  // Step 1 — run every planned search plus the App Store / Exodus lookups in parallel
+  onProgress(`Checking App Store and Exodus Privacy for "${vendorName}"`);
+  const [searches, appStore, exodus] = await Promise.all([
+    runSearches(vendorQueries(vendorName, districtName), onProgress),
+    lookupAppStore(vendorName).catch((err) => ({ found: false, error: String(err) })),
+    lookupExodus(vendorName).catch((err) => ({ error: String(err) })),
+  ]);
 
-  const MAX_ITERATIONS = 40;
-  let stepCount = 0;
-
-  for (let i = 0; i < MAX_ITERATIONS; i++) {
-    const response = result.response;
-    const functionCalls = response.functionCalls();
-
-    if (!functionCalls?.length) {
-      onProgress("Compiling final report…");
-      const jsonStr = extractJSON(response.text());
-      const report = JSON.parse(jsonStr) as VendorReport;
-      report.analysisDate = new Date().toISOString();
-      if (report.dataFlowNodes?.length) {
-        report.diagramCode = buildMermaidDiagram(report.dataFlowNodes, report.vendorName);
-      }
-      return report;
+  // Step 2 — Claude picks the pages worth reading; fetch them in parallel
+  onProgress("Choosing which pages to read…");
+  const urls = await selectPagesToFetch(task, searches, 15);
+  const pages = await mapLimit(urls, 8, async (url) => {
+    onProgress(`Fetching: ${url}`);
+    try {
+      return { url, text: await fetchPageText(url, 8000, USER_AGENT) };
+    } catch (err) {
+      return { url, error: `Page could not be fetched (${err instanceof Error ? err.message : String(err)})` };
     }
+  });
 
-    const toolResponses: Array<{ functionResponse: { name: string; response: { result: string } } }> = [];
-    for (const call of functionCalls) {
-      stepCount++;
-      const toolName = call.name;
-      const toolInput = call.args as Record<string, unknown>;
-      const progressMsg = (() => {
-        if (toolName === "search_web")      return `[${stepCount}] Searching: "${toolInput.query}"`;
-        if (toolName === "fetch_page")      return `[${stepCount}] Fetching: ${toolInput.url}`;
-        if (toolName === "lookup_exodus")   return `[${stepCount}] Checking Exodus Privacy for "${toolInput.appName}"`;
-        if (toolName === "lookup_appstore")      return `[${stepCount}] Checking App Store for "${toolInput.appName}"`;
-        return `[${stepCount}] Running ${toolName}`;
-      })();
-      onProgress(progressMsg);
-      const output = await executeTool(toolName, toolInput);
-      toolResponses.push({ functionResponse: { name: toolName, response: { result: output } } });
-    }
-    result = await withRetry(() => chat.sendMessage(toolResponses));
+  // Step 3 — Claude writes the report, with a few turns of follow-up lookups if needed
+  onProgress("Analyzing evidence…");
+  const evidence = { searches, appStoreLookup: appStore, exodusLookup: exodus, fetchedPages: pages };
+  const text = await runToolLoop({
+    system: SYSTEM_PROMPT,
+    tools: TOOLS,
+    userMessage: `${task} Use the evidence below, fill important gaps with tools if needed, then output the JSON report.\n\nEVIDENCE:\n${JSON.stringify(evidence)}`,
+    maxIterations: 6,
+    effort: "medium",
+    executeTool,
+    describeCall: (step, toolName, toolInput) => {
+      if (toolName === "search_web") return `[follow-up ${step}] Searching: "${toolInput.query}"`;
+      if (toolName === "fetch_page") return `[follow-up ${step}] Fetching: ${toolInput.url}`;
+      return `[follow-up ${step}] Running ${toolName}`;
+    },
+    onProgress,
+  });
+
+  onProgress("Compiling final report…");
+  const report = JSON.parse(extractJSON(text)) as VendorReport;
+  report.analysisDate = new Date().toISOString();
+  if (report.dataFlowNodes?.length) {
+    report.diagramCode = buildMermaidDiagram(report.dataFlowNodes, report.vendorName);
   }
-
-  throw new Error("Agent exceeded maximum iterations");
+  return report;
 }

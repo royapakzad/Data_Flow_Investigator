@@ -1,25 +1,7 @@
-import { GoogleGenerativeAI, SchemaType, FunctionCallingMode, type FunctionDeclaration } from "@google/generative-ai";
-import { braveSearch } from "./brave-search";
+import type Anthropic from "@anthropic-ai/sdk";
+import { runToolLoop, runSearches, selectPagesToFetch, mapLimit, fetchPageText } from "./claude-agent";
+import { tavilySearch } from "./tavily-search";
 import type { CountyReport } from "./types";
-
-const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 3, baseMs = 3000): Promise<T> {
-  let lastErr: unknown;
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastErr = err;
-      if (attempt < maxAttempts - 1) await sleep(baseMs * Math.pow(2, attempt));
-    }
-  }
-  throw lastErr;
-}
 
 function extractJSON(text: string): string {
   const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
@@ -30,15 +12,15 @@ function extractJSON(text: string): string {
   return text.trim();
 }
 
-const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
+const TOOLS: Anthropic.Beta.BetaTool[] = [
   {
     name: "search_web",
     description: "Search the web for information. Use targeted, specific queries.",
-    parameters: {
-      type: SchemaType.OBJECT,
+    input_schema: {
+      type: "object",
       properties: {
-        query: { type: SchemaType.STRING, description: "Search query" },
-        count: { type: SchemaType.NUMBER, description: "Number of results (1-10, default 5)" },
+        query: { type: "string", description: "Search query" },
+        count: { type: "number", description: "Number of results (1-10, default 5)" },
       },
       required: ["query"],
     },
@@ -46,10 +28,10 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: "fetch_page",
     description: "Fetch a web page and return its text content. Returns up to 10000 characters.",
-    parameters: {
-      type: SchemaType.OBJECT,
+    input_schema: {
+      type: "object",
       properties: {
-        url: { type: SchemaType.STRING, description: "URL to fetch" },
+        url: { type: "string", description: "URL to fetch" },
       },
       required: ["url"],
     },
@@ -63,7 +45,10 @@ Given a county name and US state, research the public education data integration
 IMPORTANT CONTEXT:
 Education data integration systems in the US are primarily operated at the STATE level, not county level. County schools participate in state-mandated systems. Research the state's systems and note that they apply to all counties in the state. If the county corresponds to a large urban district (e.g., Los Angeles County → Los Angeles USD, Cook County IL → Chicago Public Schools, New York City → NYC DOE), also research district-specific implementations.
 
-RESEARCH PLAN (20-30 tool calls):
+HOW THIS RUN WORKS:
+The research plan below has already been run for you: the user message contains the results of every planned search and the full text of the most relevant pages. Treat the plan as a checklist. Work from that evidence first; use search_web / fetch_page only to fill important gaps (e.g. finding a vendor contract or a state privacy statute that wasn't covered). When you need more than one lookup, request them all in the same turn so they run in parallel. Keep follow-ups to a few turns, then write the report.
+
+RESEARCH PLAN:
 
 PART 1 — STATE LONGITUDINAL DATA SYSTEM (SLDS / P-20W):
 1. Search "STATE statewide longitudinal data system SLDS"
@@ -213,10 +198,12 @@ TOOL FAILURE HANDLING — critical:
 
 Output ONLY the JSON object. No markdown fences, no explanation.`;
 
+const USER_AGENT = "Mozilla/5.0 (compatible; EduDataResearchBot/1.0)";
+
 async function executeTool(name: string, input: Record<string, unknown>): Promise<string> {
   try {
     if (name === "search_web") {
-      const results = await braveSearch(
+      const results = await tavilySearch(
         input.query as string,
         (input.count as number) ?? 5
       );
@@ -224,14 +211,7 @@ async function executeTool(name: string, input: Record<string, unknown>): Promis
     }
 
     if (name === "fetch_page") {
-      const res = await fetch(input.url as string, {
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; EduDataResearchBot/1.0)" },
-        signal: AbortSignal.timeout(15000),
-      });
-      if (!res.ok) return `Error: HTTP ${res.status}`;
-      const text = await res.text();
-      const cleaned = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-      return cleaned.slice(0, 10000);
+      return await fetchPageText(input.url as string, 10000, USER_AGENT);
     }
 
     return `Unknown tool: ${name}`;
@@ -247,6 +227,32 @@ async function executeTool(name: string, input: Record<string, unknown>): Promis
   }
 }
 
+function countyQueries(st: string, stateAbbr: string): string[] {
+  return [
+    `${st} statewide longitudinal data system SLDS`,
+    `${st} P-20W education data system`,
+    `site:nces.ed.gov ${st} SLDS`,
+    `${st} department of education longitudinal data vendor contract`,
+    `${st} SLDS vendor`,
+    `${st} early childhood integrated data system ECIDS`,
+    `${st} preschool data system Head Start data`,
+    `Data Quality Campaign ${st} state profile`,
+    `${st} kindergarten entry assessment KEA policy`,
+    `${st} kindergarten readiness assessment instrument`,
+    `${st} education workforce data linkage learning employment record`,
+    `${st} education health data linkage Medicaid`,
+    `${st} juvenile justice education data sharing`,
+    `${st} migrant education data MSIX`,
+    `${st} military families education data`,
+    `${st} EdFacts reporting federal education data`,
+    `${st} Head Start federal reporting`,
+    `${st} education data system vendor contract awarded`,
+    `${st} ${stateAbbr} education data Tyler Technologies Infinite Campus PowerSchool eScholar`,
+    `${st} student data privacy law`,
+    `${st} education data governance policy`,
+  ];
+}
+
 export async function runCountyAgent(
   countyName: string,
   stateName: string,
@@ -254,56 +260,50 @@ export async function runCountyAgent(
   fipsCode: string,
   onProgress: (msg: string) => void
 ): Promise<CountyReport> {
-  const model = client.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    systemInstruction: SYSTEM_PROMPT,
-    tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
-    toolConfig: { functionCallingConfig: { mode: FunctionCallingMode.AUTO } },
-    generationConfig: { maxOutputTokens: 20000 },
-  });
+  const task =
+    `Investigate the public education data integration systems serving ${countyName} County, ${stateName} (${stateAbbr}), FIPS code ${fipsCode}. ` +
+    `Research the state's SLDS/P-20W system, ECIDS, Kindergarten Entry Assessment policy, cross-sector data linkages (workforce/LER, health, justice, military, migration), ` +
+    `and applicable data safeguards. Find and verify the vendors and technology companies that built or operate these systems.`;
 
-  const chat = model.startChat();
   onProgress(`Starting investigation of ${countyName} County, ${stateName}…`);
 
-  let result = await withRetry(() =>
-    chat.sendMessage(
-      `Investigate the public education data integration systems serving ${countyName} County, ${stateName} (${stateAbbr}), FIPS code ${fipsCode}. ` +
-      `Research the state's SLDS/P-20W system, ECIDS, Kindergarten Entry Assessment policy, cross-sector data linkages (workforce/LER, health, justice, military, migration), ` +
-      `and applicable data safeguards. Find and verify the vendors and technology companies that built or operate these systems. ` +
-      `Output the full JSON report.`
-    )
+  // Step 1 — run every planned search in parallel
+  const searches = await runSearches(
+    [...countyQueries(stateName, stateAbbr), `${countyName} County ${stateName} school district student data system`],
+    onProgress,
   );
 
-  const MAX_ITERATIONS = 35;
-  let stepCount = 0;
-
-  for (let i = 0; i < MAX_ITERATIONS; i++) {
-    const response = result.response;
-    const functionCalls = response.functionCalls();
-
-    if (!functionCalls?.length) {
-      onProgress("Compiling final report…");
-      const jsonStr = extractJSON(response.text());
-      const report = JSON.parse(jsonStr) as CountyReport;
-      report.analysisDate = new Date().toISOString();
-      return report;
+  // Step 2 — Claude picks the pages worth reading; fetch them in parallel (NCES state page always included)
+  onProgress("Choosing which pages to read…");
+  const picked = await selectPagesToFetch(task, searches, 14);
+  const urls = Array.from(new Set(["https://nces.ed.gov/programs/slds/stateInfo.asp", ...picked]));
+  const pages = await mapLimit(urls, 8, async (url) => {
+    onProgress(`Fetching: ${url}`);
+    try {
+      return { url, text: await fetchPageText(url, 10000, USER_AGENT) };
+    } catch (err) {
+      return { url, error: `Page could not be fetched (${err instanceof Error ? err.message : String(err)})` };
     }
+  });
 
-    const toolResponses: Array<{ functionResponse: { name: string; response: { result: string } } }> = [];
-    for (const call of functionCalls) {
-      stepCount++;
-      const toolName = call.name;
-      const toolInput = call.args as Record<string, unknown>;
-      const progressMsg =
-        toolName === "search_web" ? `[${stepCount}] Searching: "${toolInput.query}"` :
-        toolName === "fetch_page" ? `[${stepCount}] Fetching: ${toolInput.url}` :
-        `[${stepCount}] Running ${toolName}`;
-      onProgress(progressMsg);
-      const output = await executeTool(toolName, toolInput);
-      toolResponses.push({ functionResponse: { name: toolName, response: { result: output } } });
-    }
-    result = await withRetry(() => chat.sendMessage(toolResponses));
-  }
+  // Step 3 — Claude writes the report, with a few turns of follow-up lookups if needed
+  onProgress("Analyzing evidence…");
+  const text = await runToolLoop({
+    system: SYSTEM_PROMPT,
+    tools: TOOLS,
+    userMessage: `${task} Use the evidence below, fill important gaps with tools if needed, then output the full JSON report.\n\nEVIDENCE:\n${JSON.stringify({ searches, fetchedPages: pages })}`,
+    maxIterations: 6,
+    effort: "medium",
+    executeTool,
+    describeCall: (step, toolName, toolInput) =>
+      toolName === "search_web" ? `[follow-up ${step}] Searching: "${toolInput.query}"` :
+      toolName === "fetch_page" ? `[follow-up ${step}] Fetching: ${toolInput.url}` :
+      `[follow-up ${step}] Running ${toolName}`,
+    onProgress,
+  });
 
-  throw new Error("Agent exceeded maximum iterations");
+  onProgress("Compiling final report…");
+  const report = JSON.parse(extractJSON(text)) as CountyReport;
+  report.analysisDate = new Date().toISOString();
+  return report;
 }

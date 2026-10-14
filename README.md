@@ -107,11 +107,11 @@ For policy makers, the tools surface patterns that are difficult to see in indiv
 
 ## How It Works
 
-Both modes use a Google Gemini 2.5 Flash AI agent with web search and page fetch tools. The agent runs a structured research protocol, makes 20–40 tool calls per analysis, and produces a structured JSON report rendered in the UI.
+Both modes use Claude (Sonnet 5.5). The app first runs the full research plan in parallel — 20–30 web searches plus App Store and Exodus Privacy lookups — then Claude picks the most relevant pages to read, and finally writes a structured JSON report (with a few follow-up searches if needed). The ownership lookup still runs as a step-by-step agent, since it follows each acquisition wherever it leads.
 
 | Tool | What it does |
 |---|---|
-| `search_web` | Brave Search API — finds documents, contracts, news, and technical disclosures |
+| `search_web` | Tavily Search API — finds documents, contracts, news, and technical disclosures |
 | `fetch_page` | Fetches and strips HTML — reads the actual documents |
 | `lookup_exodus` | Queries Exodus Privacy for detected trackers in the Android APK (vendor mode only) |
 | `lookup_appstore` | Queries iTunes Search API for App Store metadata (vendor mode only) |
@@ -130,8 +130,8 @@ Both modes use a Google Gemini 2.5 Flash AI agent with web search and page fetch
 ### Prerequisites
 
 - Node.js 18+
-- A [Google Gemini API key](https://aistudio.google.com)
-- A [Brave Search API key](https://brave.com/search/api/) — free tier (2,000 queries/month) is sufficient
+- An [Anthropic API key](https://console.anthropic.com)
+- A [Tavily API key](https://tavily.com/) — free tier (1,000 credits/month) is sufficient
 
 ### Installation
 
@@ -145,8 +145,8 @@ cp .env.local.example .env.local
 Edit `.env.local` and add your keys:
 
 ```
-GEMINI_API_KEY=...
-BRAVE_SEARCH_API_KEY=BSA...
+ANTHROPIC_API_KEY=sk-ant-...
+TAVILY_API_KEY=tvly-...
 ```
 
 ```bash
@@ -159,20 +159,20 @@ Open [http://localhost:3000](http://localhost:3000).
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/royapakzad/vendor-data-flow)
 
-Add `GEMINI_API_KEY` and `BRAVE_SEARCH_API_KEY` as environment variables in your Vercel project settings. The Vercel free tier's 60-second function timeout may be hit on longer analyses — upgrading to Pro (300s timeout) is recommended for production use.
+Add `ANTHROPIC_API_KEY` and `TAVILY_API_KEY` as environment variables in your Vercel project settings. The Vercel free tier's 60-second function timeout may be hit on longer analyses — upgrading to Pro (300s timeout) is recommended for production use.
 
 ---
 
 ## Tech Stack
 
 - **Next.js 14** (App Router) — frontend and API routes
-- **Google Gemini 2.5 Flash** — AI agent with tool use and multi-step research
+- **Claude Sonnet 5.5 (Anthropic)** — page selection, follow-up research, and report writing
 - **Mermaid.js** — client-side data flow diagram rendering
 - **react-simple-maps** — interactive US county map
 - **Tailwind CSS** — styling
 - **Exodus Privacy API** — Android tracker detection
 - **iTunes Search API** — App Store metadata (no key required)
-- **Brave Search API** — web search
+- **Tavily Search API** — web search
 
 ---
 
