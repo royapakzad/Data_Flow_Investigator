@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ReportTabs } from "./ReportTabs";
+import { VendorList, ContractsAndSpending, GetTheRecords, RulesList } from "./CountyProcurement";
 import type {
   CountyReport,
   EduDataSystem,
@@ -546,6 +547,18 @@ export function CountyReport({ report }: Props) {
       ),
     },
     {
+      id: "money",
+      label: "Vendors & money",
+      count: report.vendors?.length ?? 0,
+      content: (
+        <>
+          <VendorList report={report} />
+          <ContractsAndSpending report={report} />
+          <GetTheRecords report={report} />
+        </>
+      ),
+    },
+    {
       id: "linkages",
       label: "Beyond education",
       count: report.crossSectorLinkages?.length ?? 0,
@@ -563,19 +576,22 @@ export function CountyReport({ report }: Props) {
       ),
     },
     {
-      id: "protections",
-      label: "Protections & gaps",
-      count: report.safeguards.length,
+      id: "rules",
+      label: "Laws & policies",
+      count: (report.rules?.length ?? lawSafeguards.length) + gapSafeguards.length,
       content: (
         <>
-          {gapSafeguards.length > 0 && (
-            <Section title="Gaps" subtitle="Where protections are missing or weak.">
-              <div className="space-y-3">{gapSafeguards.map((s, i) => <SafeguardRow key={i} safeguard={s} getCite={getCite} />)}</div>
-            </Section>
-          )}
-          {lawSafeguards.length > 0 && (
-            <Section title="Laws">
+          <Section title="Laws, regulations & policies"
+            subtitle="What applies when districts and the state buy edtech and handle student data, and what each one requires.">
+            {report.rules?.length ? (
+              <RulesList rules={report.rules} />
+            ) : (
               <div className="space-y-3">{lawSafeguards.map((s, i) => <SafeguardRow key={i} safeguard={s} getCite={getCite} />)}</div>
+            )}
+          </Section>
+          {gapSafeguards.length > 0 && (
+            <Section title="Gaps" subtitle="Where rules or protections are missing or weak.">
+              <div className="space-y-3">{gapSafeguards.map((s, i) => <SafeguardRow key={i} safeguard={s} getCite={getCite} />)}</div>
             </Section>
           )}
           {otherSafeguards.length > 0 && (

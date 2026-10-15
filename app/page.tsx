@@ -543,7 +543,7 @@ function CountyExplorer() {
   return (
     <div className="space-y-6">
       <p className="text-slate-600 max-w-2xl text-base leading-relaxed no-print">
-        The government side of student data: state data systems, who built them, and where records are linked beyond schools.
+        The government side of student data: state and district systems, the vendors and contracts behind them, the rules for buying edtech, and where records are linked beyond schools.
       </p>
 
       {/* ── County text search ──────────────────────────────────────────── */}
