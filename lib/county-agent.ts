@@ -88,17 +88,21 @@ PART 5 — FEDERAL CONNECTIONS:
 21. Note NAEP (National Assessment of Educational Progress) participation
 22. Search "STATE Head Start federal reporting"
 
-PART 6 — VENDORS & CONTRACTS:
-23. Search "STATE [system name] vendor contract awarded"
-24. Search state procurement database for education data contracts if available
-25. Look for vendors: Tyler Technologies, Infinite Campus, PowerSchool, eScholar, Oracle, Pearson, DXC Technology, Deloitte, Accenture, Teaching Strategies (GOLD), Ed-Fi based implementations
-25b. Search "STATE Teaching Strategies GOLD statewide contract per child" and note any price and data-use terms
+PART 6 — VENDORS, CONTRACTS, SPENDING & PROCUREMENT (state AND the county's main school district(s)):
+23. Identify every vendor that builds, hosts, or operates the state systems above AND the main edtech/data vendors the county's largest district(s) use (SIS, LMS, assessment, rostering, early childhood assessment, analytics/early warning).
+24. Find contracts: state procurement portal awards, statewide/cooperative contracts, district school board agendas and minutes approving contracts (often on BoardDocs, Simbli, or the district site), and federal awards (USAspending, SAM.gov, SLDS grant awards).
+25. Find spending: contract amounts, per-pupil or per-child prices (e.g. Teaching Strategies GOLD statewide pricing), state checkbook / transparency portal payments, district budget lines for technology.
+26. Note how each was bought: competitive bid (RFP), sole source, cooperative/piggyback purchase, emergency, or free pilot — and whether a data privacy agreement exists (e.g. in the Student Data Privacy Consortium registry).
+27. Find how a resident can get records that aren't online: the state public records law (name, statute, how to file, response deadline), the district's records request page, and the portals to search.
 
-PART 7 — SAFEGUARDS:
-26. Search "STATE student data privacy law" (find the law name, year, statute number)
-27. Note federal protections: FERPA, COPPA, PPRA, Every Student Succeeds Act (ESSA)
-28. Search "STATE education data governance policy"
-29. Identify any GAPS where protections are absent or weak
+PART 7 — LAWS, REGULATIONS & POLICIES FOR RESPONSIBLE PROCUREMENT AND DATA PROTECTION:
+28. State procurement law that applies to school districts (bid thresholds, sole-source rules, cooperative purchasing).
+29. Federal procurement standards for purchases made with federal funds (2 CFR 200.317–200.327, "EDGAR").
+30. Student privacy laws and what they require of vendors and contracts: FERPA (school-official exception, direct control), COPPA (including the 2025 amendments on biometric data and third-party disclosure), PPRA, and the state's student privacy law(s) (name, year, statute) — e.g. required contract terms, bans on targeted advertising and sale, deletion duties, breach notification.
+31. Required or model data privacy agreements (state DPA, National DPA via SDPC), state data security standards, and data breach notification law.
+32. Accessibility requirements for digital tools (ADA Title II web accessibility rule, Section 504/508 where relevant).
+33. State or district guidance on AI in schools and on edtech vetting/procurement.
+34. Identify GAPS where rules are absent or weak (e.g. no requirement to disclose subprocessors, no re-review after acquisition, pilots outside procurement).
 
 AUTHORITATIVE SOURCES TO PRIORITIZE:
 - ed.gov, nces.ed.gov (federal)
@@ -108,7 +112,8 @@ AUTHORITATIVE SOURCES TO PRIORITIZE:
 - dol.gov (workforce LER)
 - buildinitiative.org (ECIDS)
 - Government procurement/contract databases
-- Official state legislative pages for privacy laws
+- Official state legislative pages for privacy and procurement laws
+- State procurement portals and checkbook/transparency sites; district board agendas and minutes; usaspending.gov; sam.gov; sdpc.a4l.org (data privacy agreements)
 
 After gathering data, output a JSON object matching this schema EXACTLY:
 
@@ -169,6 +174,49 @@ After gathering data, output a JSON object matching this schema EXACTLY:
     }
   ],
 
+  "vendors": [                 // every vendor found across state systems and the main district(s)
+    {
+      "name": string,
+      "provides": string,        // what they provide, in plain language
+      "systems": string[],       // which systems/products, e.g. ["SLDS data warehouse"], ["Student information system"]
+      "level": "state" | "district" | "both",
+      "website": string | null,
+      "dataAgreement": "yes" | "no" | "unknown",   // a data privacy agreement found?
+      "dataAgreementUrl": string | null,
+      "sourceUrl": string | null
+    }
+  ],
+  "contracts": [
+    {
+      "vendor": string,
+      "agency": string,          // who signed: state agency or district
+      "title": string,
+      "amount": string | null,   // as stated, e.g. "$4.2M over 5 years", "$14 per child per year"
+      "period": string | null,   // e.g. "2021–2026"
+      "procurementMethod": "competitive-bid" | "sole-source" | "cooperative" | "emergency" | "pilot" | "grant-funded" | "unknown",
+      "documentUrl": string      // MUST be a real URL: award notice, board minutes, contract PDF
+    }
+  ],
+  "spending": {
+    "summary": string,          // what is known about spending, or plainly that it was not found
+    "items": [ { "description": string, "amount": string, "period": string | null, "sourceUrl": string } ]
+  },
+  "findTheRecords": {           // ALWAYS fill this, even if contracts were found
+    "publicRecordsLaw": string, // name and statute, e.g. "Oregon Public Records Law (ORS 192.311–192.478)"
+    "howToRequest": string,     // who to send it to, how, typical deadline/fees, in 2-3 sentences
+    "requestUrl": string | null,
+    "places": [ { "name": string, "whatYouFind": string, "url": string } ],   // portals: state procurement site, checkbook, board agendas, SDPC registry, USAspending...
+    "sampleRequest": string     // a short, ready-to-send records request asking for edtech/data contracts, DPAs, amounts, and procurement records for the past 5 years
+  },
+  "rules": [                    // laws, regulations, and policies relevant to responsible procurement and data protection
+    {
+      "name": string,           // e.g. "FERPA", "Oregon Student Information Protection Act (ORS 336.184)"
+      "level": "federal" | "state" | "district",
+      "category": "procurement" | "student-privacy" | "data-security" | "contract-requirements" | "accessibility" | "ai-guidance" | "records-access",
+      "requires": string,       // what it actually requires of districts or vendors, in plain language, 1-2 sentences
+      "url": string | null
+    }
+  ],
   "keyFindings": string[],
   "questionsToAsk": string[],
 
@@ -189,12 +237,14 @@ ANTI-HALLUCINATION RULES — strictly enforced:
 - Every citation URL must be a URL you actually retrieved or found in search results during this session.
 - For dataElements, only list data types explicitly mentioned in sources you found. Do not infer what "probably" is collected.
 - For crossSectorLinkages: only include linkages you found evidence for. Use source: "inferred" if the linkage is known to exist in the state generally but you found no specific URL.
-- For safeguards: ALWAYS include relevant gaps as category "gap" when protections are known to be absent. Gaps are as important as protections.
+- For safeguards: ALWAYS include relevant gaps as category "gap" when protections are known to be absent. Gaps are as important as protections. Put laws and regulations in "rules" (not in safeguards); use safeguards for gaps and technical/policy controls.
+- contracts and spending.items: ONLY include entries with a real document URL from this session. Never estimate amounts. If nothing was found, leave them empty and say so in spending.summary — findTheRecords tells the reader how to get them.
+- rules: name the actual statute or regulation with its citation when you found it; "requires" must reflect the source, not a guess. Include federal rules (FERPA, COPPA, PPRA, 2 CFR 200 procurement standards, ADA Title II) even if not separately researched, with official URLs (ecfr.gov, ed.gov, ftc.gov, ada.gov).
 - If a system exists in the state but you found no vendor information, set vendors to [].
 - dataAvailabilityNote must honestly explain what is and isn't known at the county vs state level.
 
 For keyFindings: 4-6 specific, substantive findings about what data is collected, shared, with whom, and which companies are paid to run it. Plain language a parent could follow.
-For questionsToAsk: 5-8 specific questions for a school board member, parent advocate, or journalist based on actual gaps (e.g. which agencies can link to children's records, how immigration-enforcement or law-enforcement requests are handled, what vendors may do with the data, how long records are kept).
+For questionsToAsk: 5-8 specific questions for a school board member, parent advocate, or journalist based on actual gaps (e.g. which agencies can link to children's records, how immigration-enforcement or law-enforcement requests are handled, what vendors may do with the data, how long records are kept, which contracts were sole-sourced or started as pilots, whether every vendor has a signed data privacy agreement, and whether vendors are re-reviewed after an acquisition).
 For citations: 8-20 entries — all major findings must cite a source URL you actually visited.
 
 TOOL FAILURE HANDLING — critical:
@@ -256,6 +306,19 @@ function countyQueries(st: string, stateAbbr: string): string[] {
     `${st} education research data center student data access`,
     `${st} Teaching Strategies GOLD statewide contract per child`,
     `${st} Ed-Fi data standard state reporting`,
+    // Procurement, contracts, spending
+    `${st} state procurement portal education technology contract awards`,
+    `${st} statewide contract or cooperative purchasing for education software`,
+    `${st} state checkbook or transparency portal vendor payments`,
+    `${st} public records law how to request school district records`,
+    `${st} Student Data Privacy Consortium data privacy agreements registry`,
+    `${st} statewide longitudinal data system grant award vendor`,
+    // Rules for responsible procurement and data protection
+    `${st} procurement law school districts bid threshold sole source`,
+    `${st} student data privacy law vendor contract requirements`,
+    `${st} education technology vetting or procurement guidance data privacy`,
+    `${st} guidance on artificial intelligence in K-12 schools`,
+    `${st} data breach notification law schools`,
     `${st} EdFacts reporting federal education data`,
     `${st} Head Start federal reporting`,
     `${st} education data system vendor contract awarded`,
@@ -275,20 +338,28 @@ export async function runCountyAgent(
   const task =
     `Investigate the public education data integration systems serving ${countyName} County, ${stateName} (${stateAbbr}), FIPS code ${fipsCode}. ` +
     `Research the state's SLDS/P-20W system, ECIDS, Kindergarten Entry Assessment policy, cross-sector data linkages (workforce/LER, health, justice, military, migration), ` +
-    `and applicable data safeguards. Find and verify the vendors and technology companies that built or operate these systems.`;
+    `applicable data safeguards, every vendor that built or operates these systems or serves the main district(s), their contracts, spending, and procurement method, ` +
+    `how a resident can obtain records that aren't online, and the laws, regulations, and policies governing responsible edtech procurement and data protection.`;
 
   assertKeys();
   onProgress(`Starting investigation of ${countyName} County, ${stateName}…`);
 
   // Step 1 — run every planned search in parallel
   const searches = await runSearches(
-    [...countyQueries(stateName, stateAbbr), `${countyName} County ${stateName} school district student data system`],
+    [
+      ...countyQueries(stateName, stateAbbr),
+      `${countyName} County ${stateName} largest school district student information system and learning platforms`,
+      `${countyName} County ${stateName} school board approves technology software contract`,
+      `${countyName} County ${stateName} school district technology budget spending`,
+      `${countyName} County ${stateName} school district data privacy agreements vendors list`,
+      `${countyName} County ${stateName} school district public records request`,
+    ],
     onProgress,
   );
 
   // Step 2 — Claude picks the pages worth reading; fetch them in parallel (NCES state page always included)
   onProgress("Choosing which pages to read…");
-  const picked = await selectPagesToFetch(task, searches, 14);
+  const picked = await selectPagesToFetch(task, searches, 20);
   const urls = Array.from(new Set(["https://nces.ed.gov/programs/slds/stateInfo.asp", ...picked]));
   const pages = await readPages(urls, 20000, onProgress);
 
@@ -298,7 +369,7 @@ export async function runCountyAgent(
     system: SYSTEM_PROMPT,
     tools: TOOLS,
     userMessage: `${task} Use the evidence below, fill important gaps with tools if needed, then output the full JSON report.\n\nEVIDENCE:\n${JSON.stringify({ searches, fetchedPages: pages })}`,
-    maxIterations: 6,
+    maxIterations: 8,
     effort: "medium",
     executeTool,
     describeCall: (step, toolName, toolInput) =>

@@ -271,6 +271,43 @@ export interface DataSafeguard {
   citationNumbers: number[];
 }
 
+export interface CountyVendor {
+  name: string;
+  provides: string;
+  systems: string[];
+  level: "state" | "district" | "both";
+  website: string | null;
+  dataAgreement: "yes" | "no" | "unknown";
+  dataAgreementUrl: string | null;
+  sourceUrl: string | null;
+}
+
+export interface CountyContract {
+  vendor: string;
+  agency: string;
+  title: string;
+  amount: string | null;
+  period: string | null;
+  procurementMethod: "competitive-bid" | "sole-source" | "cooperative" | "emergency" | "pilot" | "grant-funded" | "unknown";
+  documentUrl: string;
+}
+
+export interface FindTheRecords {
+  publicRecordsLaw: string;
+  howToRequest: string;
+  requestUrl: string | null;
+  places: { name: string; whatYouFind: string; url: string }[];
+  sampleRequest: string;
+}
+
+export interface ProcurementRule {
+  name: string;
+  level: "federal" | "state" | "district";
+  category: "procurement" | "student-privacy" | "data-security" | "contract-requirements" | "accessibility" | "ai-guidance" | "records-access";
+  requires: string;
+  url: string | null;
+}
+
 export interface CountyReport {
   countyName: string;
   stateName: string;
@@ -281,6 +318,12 @@ export interface CountyReport {
   educationSystems: EduDataSystem[];
   crossSectorLinkages: CrossSectorLinkage[];
   safeguards: DataSafeguard[];
+  // Older shared reports predate these fields
+  vendors?: CountyVendor[];
+  contracts?: CountyContract[];
+  spending?: { summary: string; items: { description: string; amount: string; period: string | null; sourceUrl: string }[] };
+  findTheRecords?: FindTheRecords;
+  rules?: ProcurementRule[];
   keyFindings: string[];
   questionsToAsk: string[];
   citations: Citation[];
